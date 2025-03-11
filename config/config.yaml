@@ -1,0 +1,34 @@
+app:
+  name: "bookshop-api"
+  environment: "development"
+  log_level: "debug"
+
+http:
+  host: "0.0.0.0"
+  port: 8080
+  read_timeout: "10s"
+  write_timeout: "10s"
+  idle_timeout: "60s"
+
+database:
+  host: "localhost"
+  port: 5432
+  user: "bookshop"
+  password: "bookshop"
+  db_name: "bookshop"
+  ssl_mode: "disable"
+  max_conns: 10
+  timeout: "5s"
+
+redis:
+  host: "localhost"
+  port: 6379
+  password: ""
+  db: 0
+  timeout: "5s"
+
+jwt:
+  secret: "super-secret-key-change-in-production"
+  access_token_ttl: "15m"
+  refresh_token_ttl: "24h"
+  cart_expiration_ttl: "30m" 

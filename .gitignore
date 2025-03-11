@@ -1,0 +1,32 @@
+# Бинарные файлы
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Директории для кэширования и зависимостей
+/vendor/
+/.idea/
+/.vscode/
+/bin/
+/dist/
+
+# Файлы логов
+*.log
+
+# Локальные конфигурационные файлы
+.env
+*.local.yaml
+*.local.yml
+
+# Скомпилированные файлы Go
+/api
+/bookshop-api
+
+# Временные файлы
+.DS_Store
+Thumbs.db
+.tmp/
