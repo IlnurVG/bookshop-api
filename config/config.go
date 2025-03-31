@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -11,11 +12,12 @@ import (
 
 // Config contains all application settings
 type Config struct {
-	App      AppConfig
-	HTTP     HTTPConfig
-	Database DatabaseConfig
-	Redis    RedisConfig
-	JWT      JWTConfig
+	App       AppConfig
+	HTTP      HTTPConfig
+	Database  DatabaseConfig
+	Redis     RedisConfig
+	JWT       JWTConfig
+	RateLimit RateLimiterConfig
 }
 
 // AppConfig contains general application settings
@@ -63,6 +65,15 @@ type JWTConfig struct {
 	CartExpirationTTL time.Duration
 }
 
+// RateLimiterConfig contains rate limiter settings
+type RateLimiterConfig struct {
+	Enabled          bool
+	GlobalIPLimit    int            // Global rate limit per IP per second
+	DefaultPathLimit int            // Default rate limit per path per second
+	CleanupInterval  time.Duration  // Interval for cleaning up stale limiters
+	Endpoints        map[string]int // Custom rate limits for specific endpoints
+}
+
 // LoadConfig loads configuration from environment variables
 // For local development, it will try to load .env file first
 func LoadConfig() (Config, error) {
@@ -70,11 +81,12 @@ func LoadConfig() (Config, error) {
 	_ = godotenv.Load()
 
 	return Config{
-		App:      loadAppConfig(),
-		HTTP:     loadHTTPConfig(),
-		Database: loadDatabaseConfig(),
-		Redis:    loadRedisConfig(),
-		JWT:      loadJWTConfig(),
+		App:       loadAppConfig(),
+		HTTP:      loadHTTPConfig(),
+		Database:  loadDatabaseConfig(),
+		Redis:     loadRedisConfig(),
+		JWT:       loadJWTConfig(),
+		RateLimit: loadRateLimiterConfig(),
 	}, nil
 }
 
@@ -128,6 +140,32 @@ func loadJWTConfig() JWTConfig {
 	}
 }
 
+func loadRateLimiterConfig() RateLimiterConfig {
+	// Parse endpoint-specific rate limits
+	endpointLimits := make(map[string]int)
+	endpointConfig := getEnv("RATE_LIMIT_ENDPOINTS", "/api/v1/checkout=20,/api/v1/orders=50,/api/v1/admin/*=10")
+
+	if endpointConfig != "" {
+		pairs := strings.Split(endpointConfig, ",")
+		for _, pair := range pairs {
+			if kv := strings.Split(pair, "="); len(kv) == 2 {
+				path := strings.TrimSpace(kv[0])
+				if limit, err := strconv.Atoi(strings.TrimSpace(kv[1])); err == nil {
+					endpointLimits[path] = limit
+				}
+			}
+		}
+	}
+
+	return RateLimiterConfig{
+		Enabled:          getEnvAsBool("RATE_LIMIT_ENABLED", true),
+		GlobalIPLimit:    getEnvAsInt("RATE_LIMIT_GLOBAL_IP", 100),    // 100 requests per second per IP
+		DefaultPathLimit: getEnvAsInt("RATE_LIMIT_DEFAULT_PATH", 200), // 200 requests per second per path
+		CleanupInterval:  time.Duration(getEnvAsInt("RATE_LIMIT_CLEANUP_MINUTES", 5)) * time.Minute,
+		Endpoints:        endpointLimits,
+	}
+}
+
 // Helper functions to get environment variables with defaults
 func getEnv(key, defaultValue string) string {
 	if value, exists := os.LookupEnv(key); exists {
@@ -140,6 +178,15 @@ func getEnvAsInt(key string, defaultValue int) int {
 	if value, exists := os.LookupEnv(key); exists {
 		if intVal, err := strconv.Atoi(value); err == nil {
 			return intVal
+		}
+	}
+	return defaultValue
+}
+
+func getEnvAsBool(key string, defaultValue bool) bool {
+	if value, exists := os.LookupEnv(key); exists {
+		if boolVal, err := strconv.ParseBool(value); err == nil {
+			return boolVal
 		}
 	}
 	return defaultValue
