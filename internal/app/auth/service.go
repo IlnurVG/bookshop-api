@@ -83,7 +83,7 @@ func (s *Service) Register(ctx context.Context, input models.UserRegistration) (
 
 	// Save user
 	if err := s.userRepo.Create(ctx, user); err != nil {
-		if errors.Is(err, repositories.ErrDuplicateKey) {
+		if errors.Is(err, domainerrors.ErrUserAlreadyExists) {
 			return nil, domainerrors.ErrUserAlreadyExists
 		}
 		return nil, fmt.Errorf("error creating user: %w", err)
@@ -97,7 +97,7 @@ func (s *Service) Login(ctx context.Context, input models.UserCredentials) (stri
 	// Get user by email
 	user, err := s.userRepo.GetByEmail(ctx, input.Email)
 	if err != nil {
-		if errors.Is(err, repositories.ErrNotFound) {
+		if errors.Is(err, domainerrors.ErrUserNotFound) {
 			return "", "", domainerrors.ErrInvalidCredentials
 		}
 		return "", "", fmt.Errorf("error getting user: %w", err)

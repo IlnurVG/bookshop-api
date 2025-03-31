@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	domainerrors "github.com/bookshop/api/internal/domain/errors"
 	"github.com/bookshop/api/internal/domain/models"
 	"github.com/bookshop/api/internal/domain/repositories"
 	"github.com/jackc/pgx/v5"
@@ -55,7 +56,7 @@ func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 		// Check if this is a unique constraint violation
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == UniqueViolationCode {
-			return repositories.ErrDuplicateKey
+			return domainerrors.ErrUserAlreadyExists
 		}
 		return fmt.Errorf("failed to create user: %w", err)
 	}
@@ -83,7 +84,7 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*models.User, err
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, repositories.ErrNotFound
+			return nil, domainerrors.ErrUserNotFound
 		}
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
@@ -111,7 +112,7 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, repositories.ErrNotFound
+			return nil, domainerrors.ErrUserNotFound
 		}
 		return nil, fmt.Errorf("failed to get user by email: %w", err)
 	}
