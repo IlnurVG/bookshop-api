@@ -26,7 +26,7 @@ const (
 // Service implements services.AuthService interface
 type Service struct {
 	userRepo repositories.UserRepository
-	tokenMgr TokenManager
+	tokenMgr services.TokenManager
 	logger   logger.Logger
 }
 
@@ -50,7 +50,7 @@ type TokenClaims struct {
 // NewService creates a new instance of the authentication service
 func NewService(
 	userRepo repositories.UserRepository,
-	tokenMgr TokenManager,
+	tokenMgr services.TokenManager,
 	logger logger.Logger,
 ) services.AuthService {
 	return &Service{
