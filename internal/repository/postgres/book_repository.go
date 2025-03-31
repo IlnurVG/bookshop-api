@@ -314,6 +314,29 @@ func (r *BookRepository) UpdateStock(ctx context.Context, id int, quantity int) 
 	return nil
 }
 
+// DecrementStock decreases the quantity of books in stock
+// Returns an error if there are not enough books in stock
+func (r *BookRepository) DecrementStock(ctx context.Context, id int, quantity int) error {
+	query := `
+		UPDATE books
+		SET stock = stock - $1, updated_at = $2
+		WHERE id = $3 AND stock >= $4
+		RETURNING stock
+	`
+
+	now := time.Now()
+	var newStock int
+	err := r.db.QueryRow(ctx, query, quantity, now, id, quantity).Scan(&newStock)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return fmt.Errorf("not enough books in stock for book with ID %d", id)
+		}
+		return fmt.Errorf("failed to decrement book stock: %w", err)
+	}
+
+	return nil
+}
+
 // GetBooksByIDs returns books by a list of IDs
 func (r *BookRepository) GetBooksByIDs(ctx context.Context, ids []int) ([]models.Book, error) {
 	if len(ids) == 0 {

@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/bookshop/api/config"
+	"github.com/bookshop/api/internal/app/cart"
+	"github.com/bookshop/api/internal/app/checkout"
 	"github.com/bookshop/api/internal/repository/postgres"
 	"github.com/bookshop/api/internal/repository/redis"
 	"github.com/bookshop/api/internal/server"
@@ -43,12 +45,45 @@ func main() {
 	}
 	defer redisClient.Close()
 
+	// Initialize transaction manager
+	txManager := postgres.NewTransactionManager(db)
+
 	// Initialize repositories
 	bookRepo := postgres.NewBookRepository(db)
 	categoryRepo := postgres.NewCategoryRepository(db)
+	orderRepo := postgres.NewOrderRepository(db)
+	cartRepo := redis.NewCartRepository(redisClient)
 
-	// Initialize server with minimal dependencies
-	srv, err := server.NewServer(&cfg, l, nil, bookRepo, categoryRepo)
+	// Log wrapper for modules
+	log := logger.Logger(*l)
+
+	// Initialize checkout module
+	checkoutModule := checkout.NewModule(
+		orderRepo,
+		cartRepo,
+		bookRepo,
+		txManager,
+		log,
+	)
+
+	// Initialize cart module
+	cartModule := cart.NewModule(
+		cartRepo,
+		bookRepo,
+		txManager,
+		log,
+	)
+
+	// Initialize server with dependencies
+	srv, err := server.NewServer(
+		&cfg,
+		l,
+		checkoutModule.Service,
+		cartModule.Service,
+		bookRepo,
+		categoryRepo,
+		txManager,
+	)
 	if err != nil {
 		l.Fatal("Server initialization error", err)
 	}

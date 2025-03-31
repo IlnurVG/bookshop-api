@@ -38,16 +38,7 @@ func (s *Server) registerRoutes() {
 	protected.Use(middleware.AuthMiddleware(jwtConfig))
 
 	// Cart routes
-	cart := protected.Group("/cart")
-	cart.GET("", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]string{"message": "User cart"})
-	})
-	cart.POST("/items", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]string{"message": "Add item to cart"})
-	})
-	cart.DELETE("/items/:id", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]string{"message": "Remove item from cart"})
-	})
+	s.cartHandler.RegisterRoutes(protected)
 
 	// Checkout routes
 	s.checkoutHandler.RegisterRoutes(protected)

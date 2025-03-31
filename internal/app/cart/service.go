@@ -20,47 +20,52 @@ const (
 
 // Service implements services.CartService interface
 type Service struct {
-	cartRepo repositories.CartRepository
-	bookRepo repositories.BookRepository
-	logger   logger.Logger
+	cartRepo  repositories.CartRepository
+	bookRepo  repositories.BookRepository
+	txManager repositories.TransactionManager
+	logger    logger.Logger
 }
 
 // NewService creates a new instance of the cart service
 func NewService(
 	cartRepo repositories.CartRepository,
 	bookRepo repositories.BookRepository,
+	txManager repositories.TransactionManager,
 	logger logger.Logger,
 ) services.CartService {
 	return &Service{
-		cartRepo: cartRepo,
-		bookRepo: bookRepo,
-		logger:   logger,
+		cartRepo:  cartRepo,
+		bookRepo:  bookRepo,
+		txManager: txManager,
+		logger:    logger,
 	}
 }
 
 // AddItem adds an item to the user's cart
 func (s *Service) AddItem(ctx context.Context, userID int, input models.CartItemRequest) error {
-	// Check if the book exists
-	book, err := s.bookRepo.GetByID(ctx, input.BookID)
-	if err != nil {
-		if errors.Is(err, repositories.ErrNotFound) {
-			return domainerrors.ErrBookNotFound
+	return s.txManager.WithTransaction(ctx, func(txCtx context.Context) error {
+		// Check if the book exists
+		book, err := s.bookRepo.GetByID(txCtx, input.BookID)
+		if err != nil {
+			if errors.Is(err, repositories.ErrNotFound) {
+				return domainerrors.ErrBookNotFound
+			}
+			return fmt.Errorf("error getting book: %w", err)
 		}
-		return fmt.Errorf("error getting book: %w", err)
-	}
 
-	// Check if the book is in stock
-	if book.Stock <= 0 {
-		return domainerrors.ErrOutOfStock
-	}
+		// Check if the book is in stock
+		if book.Stock <= 0 {
+			return domainerrors.ErrOutOfStock
+		}
 
-	// Add item to cart
-	expiresAt := time.Now().Add(ItemExpirationTime)
-	if err := s.cartRepo.AddItem(ctx, userID, input.BookID, expiresAt); err != nil {
-		return fmt.Errorf("error adding item to cart: %w", err)
-	}
+		// Add item to cart
+		expiresAt := time.Now().Add(ItemExpirationTime)
+		if err := s.cartRepo.AddItem(txCtx, userID, input.BookID, expiresAt); err != nil {
+			return fmt.Errorf("error adding item to cart: %w", err)
+		}
 
-	return nil
+		return nil
+	})
 }
 
 // GetCart returns the user's cart

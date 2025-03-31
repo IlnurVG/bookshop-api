@@ -16,9 +16,10 @@ type Module struct {
 func NewModule(
 	bookRepo repositories.BookRepository,
 	categoryRepo repositories.CategoryRepository,
+	txManager repositories.TransactionManager,
 ) *Module {
 	// Create service
-	service := NewService(bookRepo, categoryRepo)
+	service := NewService(bookRepo, categoryRepo, txManager)
 
 	// Create handler
 	handler := NewHandler(service)

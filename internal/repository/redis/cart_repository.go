@@ -182,6 +182,64 @@ func (r *CartRepository) UnlockCart(ctx context.Context, userID int) error {
 	return nil
 }
 
+// GetExpiredCarts returns a list of expired carts
+func (r *CartRepository) GetExpiredCarts(ctx context.Context) ([]models.Cart, error) {
+	// Get all carts
+	pattern := fmt.Sprintf("%s*", cartKeyPrefix)
+	iter := r.client.Scan(ctx, 0, pattern, 0).Iterator()
+
+	expiredCarts := make([]models.Cart, 0)
+
+	for iter.Next(ctx) {
+		key := iter.Val()
+
+		// Extract user ID from key
+		userID := 0
+		if _, err := fmt.Sscanf(key, cartKeyPrefix+"%d", &userID); err != nil {
+			continue
+		}
+
+		// Get all cart items
+		items, err := r.client.HGetAll(ctx, key).Result()
+		if err != nil {
+			continue
+		}
+
+		hasExpired := false
+		cartItems := make([]models.CartItem, 0)
+
+		// Check each item
+		for _, itemJSON := range items {
+			var item models.CartItem
+			if err := json.Unmarshal([]byte(itemJSON), &item); err != nil {
+				continue
+			}
+
+			// Check if item is expired
+			if time.Now().After(item.ExpiresAt) {
+				hasExpired = true
+			}
+
+			cartItems = append(cartItems, item)
+		}
+
+		// Add cart to result if it has expired items
+		if hasExpired {
+			cart := models.Cart{
+				UserID: userID,
+				Items:  cartItems,
+			}
+			expiredCarts = append(expiredCarts, cart)
+		}
+	}
+
+	if err := iter.Err(); err != nil {
+		return nil, fmt.Errorf("error scanning carts: %w", err)
+	}
+
+	return expiredCarts, nil
+}
+
 // isCartLocked checks if the cart is locked
 func (r *CartRepository) isCartLocked(ctx context.Context, userID int) bool {
 	key := fmt.Sprintf("%s%d", cartLockKeyPrefix, userID)

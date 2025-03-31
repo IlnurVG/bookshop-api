@@ -24,6 +24,8 @@ type Server struct {
 	Addr            string
 	checkoutService services.CheckoutService
 	checkoutHandler *handlers.CheckoutHandler
+	cartService     services.CartService
+	cartHandler     *handlers.CartHandler
 	bookModule      *book.Module
 }
 
@@ -32,8 +34,10 @@ func NewServer(
 	cfg *config.Config,
 	logger *logger.Logger,
 	checkoutService services.CheckoutService,
+	cartService services.CartService,
 	bookRepo repositories.BookRepository,
 	categoryRepo repositories.CategoryRepository,
+	txManager repositories.TransactionManager,
 ) (*Server, error) {
 	e := echo.New()
 	e.HideBanner = true
@@ -54,9 +58,10 @@ func NewServer(
 
 	// Handlers initialization
 	checkoutHandler := handlers.NewCheckoutHandler(checkoutService)
+	cartHandler := handlers.NewCartHandler(cartService)
 
 	// Book module initialization
-	bookModule := book.NewModule(bookRepo, categoryRepo)
+	bookModule := book.NewModule(bookRepo, categoryRepo, txManager)
 
 	server := &Server{
 		echo:            e,
@@ -65,6 +70,8 @@ func NewServer(
 		Addr:            addr,
 		checkoutService: checkoutService,
 		checkoutHandler: checkoutHandler,
+		cartService:     cartService,
+		cartHandler:     cartHandler,
 		bookModule:      bookModule,
 	}
 

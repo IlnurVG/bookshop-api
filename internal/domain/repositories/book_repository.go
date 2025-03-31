@@ -26,6 +26,10 @@ type BookRepository interface {
 	// UpdateStock updates the quantity of books in stock
 	UpdateStock(ctx context.Context, id int, quantity int) error
 
+	// DecrementStock decreases the quantity of books in stock
+	// Returns an error if there are not enough books in stock
+	DecrementStock(ctx context.Context, id int, quantity int) error
+
 	// GetBooksByIDs returns books by a list of IDs
 	GetBooksByIDs(ctx context.Context, ids []int) ([]models.Book, error)
 

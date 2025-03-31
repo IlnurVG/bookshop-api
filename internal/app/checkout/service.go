@@ -29,6 +29,7 @@ type Service struct {
 	orderRepo repositories.OrderRepository
 	cartRepo  repositories.CartRepository
 	bookRepo  repositories.BookRepository
+	txManager repositories.TransactionManager
 	logger    logger.Logger
 }
 
@@ -37,84 +38,104 @@ func NewService(
 	orderRepo repositories.OrderRepository,
 	cartRepo repositories.CartRepository,
 	bookRepo repositories.BookRepository,
+	txManager repositories.TransactionManager,
 	logger logger.Logger,
 ) services.CheckoutService {
 	return &Service{
 		orderRepo: orderRepo,
 		cartRepo:  cartRepo,
 		bookRepo:  bookRepo,
+		txManager: txManager,
 		logger:    logger,
 	}
 }
 
 // Checkout processes an order from the user's cart
 func (s *Service) Checkout(ctx context.Context, userID int) (*models.Order, error) {
-	// Get user's cart
-	cart, err := s.cartRepo.GetCart(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("error getting cart: %w", err)
-	}
+	var order *models.Order
 
-	// Check if cart is empty
-	if len(cart.Items) == 0 {
-		return nil, domainerrors.ErrEmptyCart
-	}
-
-	// Get books from cart
-	bookIDs := make([]int, len(cart.Items))
-	for i, item := range cart.Items {
-		bookIDs[i] = item.BookID
-	}
-
-	books, err := s.bookRepo.GetBooksByIDs(ctx, bookIDs)
-	if err != nil {
-		return nil, fmt.Errorf("error getting books: %w", err)
-	}
-
-	// Check if all books are in stock
-	for _, book := range books {
-		if book.Stock <= 0 {
-			return nil, domainerrors.ErrOutOfStock
+	// Execute the checkout in a transaction
+	err := s.txManager.WithTransaction(ctx, func(txCtx context.Context) error {
+		// Get user's cart
+		cart, err := s.cartRepo.GetCart(txCtx, userID)
+		if err != nil {
+			return fmt.Errorf("error getting cart: %w", err)
 		}
-	}
 
-	// Create order
-	order := &models.Order{
-		UserID:     userID,
-		Status:     OrderStatusNew,
-		TotalPrice: 0,
-		Items:      make([]models.OrderItem, len(cart.Items)),
-	}
+		// Check if cart is empty
+		if len(cart.Items) == 0 {
+			return domainerrors.ErrEmptyCart
+		}
 
-	// Calculate total price and create order items
-	for i, item := range cart.Items {
-		var book *models.Book
-		for _, b := range books {
-			if b.ID == item.BookID {
-				book = &b
-				break
+		// Get books from cart
+		bookIDs := make([]int, len(cart.Items))
+		for i, item := range cart.Items {
+			bookIDs[i] = item.BookID
+		}
+
+		books, err := s.bookRepo.GetBooksByIDs(txCtx, bookIDs)
+		if err != nil {
+			return fmt.Errorf("error getting books: %w", err)
+		}
+
+		// Check if all books are in stock
+		for _, book := range books {
+			if book.Stock <= 0 {
+				return domainerrors.ErrOutOfStock
 			}
 		}
 
-		if book == nil {
-			return nil, domainerrors.ErrBookNotFound
+		// Create order
+		order = &models.Order{
+			UserID:     userID,
+			Status:     OrderStatusNew,
+			TotalPrice: 0,
+			Items:      make([]models.OrderItem, len(cart.Items)),
 		}
 
-		order.Items[i] = models.OrderItem{
-			BookID: book.ID,
-			Price:  book.Price,
+		// Calculate total price and create order items
+		for i, item := range cart.Items {
+			var book *models.Book
+			for _, b := range books {
+				if b.ID == item.BookID {
+					book = &b
+					break
+				}
+			}
+
+			if book == nil {
+				return domainerrors.ErrBookNotFound
+			}
+
+			order.Items[i] = models.OrderItem{
+				BookID: book.ID,
+				Price:  book.Price,
+			}
+			order.TotalPrice += book.Price
 		}
-		order.TotalPrice += book.Price
-	}
 
-	// Save order
-	if err := s.orderRepo.Create(ctx, order); err != nil {
-		return nil, fmt.Errorf("error creating order: %w", err)
-	}
+		// Save order
+		if err := s.orderRepo.Create(txCtx, order); err != nil {
+			return fmt.Errorf("error creating order: %w", err)
+		}
 
-	// Clear cart
-	if err := s.cartRepo.ClearCart(ctx, userID); err != nil {
-		return nil, fmt.Errorf("error clearing cart: %w", err)
+		// Update book stock
+		for _, item := range cart.Items {
+			if err := s.bookRepo.DecrementStock(txCtx, item.BookID, 1); err != nil {
+				return fmt.Errorf("error updating book stock: %w", err)
+			}
+		}
+
+		// Clear cart
+		if err := s.cartRepo.ClearCart(txCtx, userID); err != nil {
+			return fmt.Errorf("error clearing cart: %w", err)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
 	}
 
 	return order, nil
@@ -152,26 +173,28 @@ func (s *Service) GetOrdersByUserID(ctx context.Context, userID int) ([]models.O
 
 // UpdateOrderStatus updates order status
 func (s *Service) UpdateOrderStatus(ctx context.Context, orderID int, status string) error {
-	// Check if the order exists
-	if _, err := s.orderRepo.GetByID(ctx, orderID); err != nil {
-		if errors.Is(err, repositories.ErrNotFound) {
-			return fmt.Errorf("order not found")
+	return s.txManager.WithTransaction(ctx, func(txCtx context.Context) error {
+		// Check if the order exists
+		if _, err := s.orderRepo.GetByID(txCtx, orderID); err != nil {
+			if errors.Is(err, repositories.ErrNotFound) {
+				return fmt.Errorf("order not found")
+			}
+			return fmt.Errorf("error getting order: %w", err)
 		}
-		return fmt.Errorf("error getting order: %w", err)
-	}
 
-	// Check status validity
-	switch status {
-	case OrderStatusPaid, OrderStatusCanceled:
-		// Valid status
-	default:
-		return fmt.Errorf("invalid order status")
-	}
+		// Check status validity
+		switch status {
+		case OrderStatusPaid, OrderStatusCanceled:
+			// Valid status
+		default:
+			return fmt.Errorf("invalid order status")
+		}
 
-	// Update status
-	if err := s.orderRepo.UpdateStatus(ctx, orderID, status); err != nil {
-		return fmt.Errorf("error updating order status: %w", err)
-	}
+		// Update status
+		if err := s.orderRepo.UpdateStatus(txCtx, orderID, status); err != nil {
+			return fmt.Errorf("error updating order status: %w", err)
+		}
 
-	return nil
+		return nil
+	})
 }

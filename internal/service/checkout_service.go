@@ -133,3 +133,8 @@ func (s *CheckoutService) GetOrderByID(ctx context.Context, orderID int, userID 
 
 	return order, nil
 }
+
+// UpdateOrderStatus updates the status of an order
+func (s *CheckoutService) UpdateOrderStatus(ctx context.Context, orderID int, status string) error {
+	return s.orderRepository.UpdateStatus(ctx, orderID, status)
+}
