@@ -10,6 +10,7 @@ import (
 	"github.com/bookshop/api/internal/domain/repositories"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 )
 
 // CartRepository implements repositories.CartRepository interface
@@ -216,4 +217,9 @@ func (r *CartRepository) UnlockCart(ctx context.Context, userID int) error {
 	}
 
 	return nil
+}
+
+// GetRedisClient returns a Redis client (not implemented for Postgres)
+func (r *CartRepository) GetRedisClient() *redis.Client {
+	return nil // Postgres implementation doesn't use Redis
 }

@@ -257,3 +257,38 @@ func (r *OrderRepository) GetOrderItems(ctx context.Context, orderID int) ([]mod
 
 	return items, nil
 }
+
+// Delete deletes an order by ID
+func (r *OrderRepository) Delete(ctx context.Context, id int) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("error starting transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// First delete order items
+	itemsQuery := `
+		DELETE FROM order_items
+		WHERE order_id = $1
+	`
+	_, err = tx.Exec(ctx, itemsQuery, id)
+	if err != nil {
+		return fmt.Errorf("error deleting order items: %w", err)
+	}
+
+	// Then delete the order
+	orderQuery := `
+		DELETE FROM orders
+		WHERE id = $1
+	`
+	_, err = tx.Exec(ctx, orderQuery, id)
+	if err != nil {
+		return fmt.Errorf("error deleting order: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("error committing transaction: %w", err)
+	}
+
+	return nil
+}

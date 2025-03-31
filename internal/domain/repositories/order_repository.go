@@ -25,4 +25,7 @@ type OrderRepository interface {
 
 	// GetOrderItems returns a list of items in the order
 	GetOrderItems(ctx context.Context, orderID int) ([]models.OrderItem, error)
+
+	// Delete deletes an order by ID
+	Delete(ctx context.Context, id int) error
 }

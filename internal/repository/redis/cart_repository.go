@@ -246,3 +246,8 @@ func (r *CartRepository) isCartLocked(ctx context.Context, userID int) bool {
 	exists, _ := r.client.Exists(ctx, key).Result()
 	return exists == 1
 }
+
+// GetRedisClient returns the underlying Redis client
+func (r *CartRepository) GetRedisClient() *redis.Client {
+	return r.client
+}

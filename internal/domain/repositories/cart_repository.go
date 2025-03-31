@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/bookshop/api/internal/domain/models"
+	"github.com/redis/go-redis/v9"
 )
 
 // CartRepository defines methods for working with shopping cart in storage
@@ -33,4 +34,7 @@ type CartRepository interface {
 
 	// UnlockCart unlocks the cart
 	UnlockCart(ctx context.Context, userID int) error
+
+	// GetRedisClient returns the underlying Redis client
+	GetRedisClient() *redis.Client
 }
