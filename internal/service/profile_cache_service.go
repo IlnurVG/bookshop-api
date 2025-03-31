@@ -19,8 +19,8 @@ type ProfileCacheService struct {
 	userRepo    repositories.UserRepository
 	orderRepo   repositories.OrderRepository
 	redisClient *redis.Client
-	cache       *cache.ProfileCache
-	cacheWorker *cache.CacheWorker // Worker pool for cache operations
+	cache       cache.ProfileCacher
+	cacheWorker *cache.CacheWorker
 	logger      logger.Logger
 }
 
@@ -31,8 +31,8 @@ func NewProfileCacheService(
 	redisClient *redis.Client,
 	logger logger.Logger,
 ) *ProfileCacheService {
-	// Create in-memory cache with 2-second TTL and 1-second cleanup interval
-	profileCache := cache.NewProfileCache(2*time.Second, 1*time.Second)
+	// Create LRU in-memory cache with capacity of 1000 users, 2-second TTL and 1-second cleanup interval
+	profileCache := cache.NewLRUProfileCache(1000, 2*time.Second, 1*time.Second)
 
 	// Create cache worker with 3 workers
 	cacheWorker := cache.NewCacheWorker(
@@ -293,30 +293,28 @@ func (s *ProfileCacheService) convertCacheToModels(profile *cache.Profile) (*mod
 	return user, orders, nil
 }
 
-// saveToL1Cache saves user and orders to the L1 (in-memory) cache
+// saveToL1Cache converts models to cache format and saves to L1 cache
 func (s *ProfileCacheService) saveToL1Cache(user *models.User, orders []models.Order) {
-	cachedOrders := make([]*cache.Order, len(orders))
+	cacheProfile := &cache.Profile{
+		UUID: strconv.Itoa(user.ID),
+		Name: user.Email,
+	}
 
+	// Convert orders to cache format
+	cacheOrders := make([]*cache.Order, len(orders))
 	for i, order := range orders {
-		// Create a copy to avoid modifying the original
-		orderCopy := order
-
-		cachedOrders[i] = &cache.Order{
+		cacheOrders[i] = &cache.Order{
 			UUID:      strconv.Itoa(order.ID),
-			Value:     orderCopy,
+			Value:     order,
 			CreatedAt: order.CreatedAt,
 			UpdatedAt: order.UpdatedAt,
 		}
 	}
+	cacheProfile.Orders = cacheOrders
 
-	cachedProfile := &cache.Profile{
-		UUID:   strconv.Itoa(user.ID),
-		Name:   user.Email, // Use Name field to store email
-		Orders: cachedOrders,
-	}
-
-	s.cache.Set(cachedProfile)
-	s.logger.Debug("Profile saved to L1 cache", "userID", user.ID)
+	// Set in cache
+	s.cache.Set(cacheProfile)
+	s.logger.Debug("Saved user to L1 cache", "userID", user.ID)
 }
 
 // saveToRedis saves user and orders to the L2 (Redis) cache
@@ -343,13 +341,13 @@ func (s *ProfileCacheService) saveToRedis(ctx context.Context, user *models.User
 	}
 }
 
-// Shutdown stops the ProfileCacheService and its worker pool
+// Shutdown properly stops all background services
 func (s *ProfileCacheService) Shutdown() {
-	// Stop the worker pool
-	s.cacheWorker.Shutdown()
-
-	// Stop the L1 cache cleanup
+	// Stop LRU cache cleanup goroutine
 	s.cache.Shutdown()
+	s.logger.Debug("Profile cache shut down")
 
-	s.logger.Info("ProfileCacheService has been shut down")
+	// Stop cache worker
+	s.cacheWorker.Shutdown()
+	s.logger.Debug("Cache worker shut down")
 }

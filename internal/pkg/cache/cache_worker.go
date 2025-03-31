@@ -31,8 +31,8 @@ type CacheTask struct {
 
 // CacheWorker handles asynchronous cache operations
 type CacheWorker struct {
-	profileCache *ProfileCache
-	redisClient  interface{} // Redis client interface
+	profileCache ProfileCacher // Используем интерфейс вместо конкретного типа
+	redisClient  interface{}   // Redis client interface
 	workerPool   *workerpool.WorkerPool
 	logger       logger.Logger
 	redisKeyFn   func(string) string // Function to generate Redis keys
@@ -40,7 +40,7 @@ type CacheWorker struct {
 
 // NewCacheWorker creates a new cache worker
 func NewCacheWorker(
-	profileCache *ProfileCache,
+	profileCache ProfileCacher, // Используем интерфейс вместо конкретного типа
 	redisClient interface{},
 	logger logger.Logger,
 	numWorkers int,
