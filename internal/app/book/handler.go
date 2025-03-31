@@ -68,7 +68,7 @@ func (h *Handler) createBook(c echo.Context) error {
 	}
 
 	// Convert model to response
-	response := FromModel(book)
+	response := fromModel(book)
 
 	return c.JSON(http.StatusCreated, response)
 }
@@ -99,7 +99,7 @@ func (h *Handler) getBook(c echo.Context) error {
 	}
 
 	// Convert model to response
-	response := FromModel(book)
+	response := fromModel(book)
 
 	return c.JSON(http.StatusOK, response)
 }
@@ -136,7 +136,7 @@ func (h *Handler) listBooks(c echo.Context) error {
 	}
 
 	// Convert model to response
-	response := FromModelList(books)
+	response := fromModelList(books)
 
 	return c.JSON(http.StatusOK, response)
 }
@@ -182,7 +182,7 @@ func (h *Handler) updateBook(c echo.Context) error {
 	}
 
 	// Convert model to response
-	response := FromModel(book)
+	response := fromModel(book)
 
 	return c.JSON(http.StatusOK, response)
 }

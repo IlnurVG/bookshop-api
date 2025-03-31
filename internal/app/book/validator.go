@@ -4,18 +4,18 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-// RegisterValidators регистрирует пользовательские валидаторы для книг
+// RegisterValidators registers custom validators for books
 func RegisterValidators(v *validator.Validate) {
-	// Здесь можно добавить пользовательские валидаторы для книг
-	// Например, валидатор для проверки ISBN, формата автора и т.д.
+	// Here you can add custom validators for books
+	// For example, a validator for checking ISBN, author format, etc.
 
-	// Пример регистрации валидатора для проверки ISBN
+	// Example of registering an ISBN validator
 	// v.RegisterValidation("isbn", validateISBN)
 }
 
-// validateISBN проверяет корректность ISBN
+// validateISBN checks the correctness of an ISBN
 // func validateISBN(fl validator.FieldLevel) bool {
 // 	isbn := fl.Field().String()
-// 	// Реализация проверки ISBN
+// 	// Implementation of ISBN validation
 // 	return true
 // }

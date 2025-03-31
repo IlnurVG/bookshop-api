@@ -29,8 +29,8 @@ type OrderResponse struct {
 	CreatedAt  time.Time           `json:"created_at"`
 }
 
-// FromModel converts a model to an API response
-func FromModel(order *models.Order) *OrderResponse {
+// fromModel converts a model to an API response
+func fromModel(order *models.Order) *OrderResponse {
 	response := &OrderResponse{
 		ID:         order.ID,
 		Status:     order.Status,
@@ -53,11 +53,11 @@ func FromModel(order *models.Order) *OrderResponse {
 	return response
 }
 
-// FromModelList converts a list of models to a list of API responses
-func FromModelList(orders []models.Order) []OrderResponse {
+// fromModelList converts a list of models to a list of API responses
+func fromModelList(orders []models.Order) []OrderResponse {
 	result := make([]OrderResponse, len(orders))
 	for i, order := range orders {
-		result[i] = *FromModel(&order)
+		result[i] = *fromModel(&order)
 	}
 	return result
 }
