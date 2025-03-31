@@ -64,9 +64,14 @@ func (c *ProfileCache) startCleanup() {
 	}
 }
 
-// Stop stops the automatic cleanup process
+// Stop terminates the cleanup goroutine
 func (c *ProfileCache) Stop() {
 	close(c.stopCleanup)
+}
+
+// Shutdown is an alias for Stop for interface consistency
+func (c *ProfileCache) Shutdown() {
+	c.Stop()
 }
 
 // Cleanup removes expired items from the cache

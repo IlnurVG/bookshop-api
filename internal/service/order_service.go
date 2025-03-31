@@ -15,14 +15,15 @@ import (
 
 // OrderService handles business logic related to orders
 type OrderService struct {
-	orderRepo      repositories.OrderRepository
-	userRepo       repositories.UserRepository
-	bookRepo       repositories.BookRepository
-	cartRepo       repositories.CartRepository // Used for cart management
-	profileCache   *cache.ProfileCache         // L1 cache for user profiles
-	logger         logger.Logger
-	txManager      repositories.TransactionManager
-	orderProcessor *OrderProcessor // Асинхронный обработчик заказов
+	orderRepo           repositories.OrderRepository
+	userRepo            repositories.UserRepository
+	bookRepo            repositories.BookRepository
+	cartRepo            repositories.CartRepository // Used for cart management
+	profileCache        *cache.ProfileCache         // L1 cache for user profiles
+	profileCacheService *ProfileCacheService        // Service for profile caching operations
+	logger              logger.Logger
+	txManager           repositories.TransactionManager
+	orderProcessor      *OrderProcessor // Asynchronous order processor
 }
 
 // NewOrderService creates a new service for working with orders
@@ -33,6 +34,7 @@ func NewOrderService(
 	cartRepo repositories.CartRepository,
 	txManager repositories.TransactionManager,
 	logger logger.Logger,
+	profileCacheService *ProfileCacheService, // Optional, can be nil
 ) *OrderService {
 	// Create in-memory cache with 2-second TTL and 1-second cleanup interval
 	profileCache := cache.NewProfileCache(2*time.Second, 1*time.Second)
@@ -47,20 +49,45 @@ func NewOrderService(
 	)
 
 	return &OrderService{
-		orderRepo:      orderRepo,
-		userRepo:       userRepo,
-		bookRepo:       bookRepo,
-		cartRepo:       cartRepo,
-		profileCache:   profileCache,
-		txManager:      txManager,
-		logger:         logger,
-		orderProcessor: orderProcessor,
+		orderRepo:           orderRepo,
+		userRepo:            userRepo,
+		bookRepo:            bookRepo,
+		cartRepo:            cartRepo,
+		profileCache:        profileCache,
+		profileCacheService: profileCacheService,
+		txManager:           txManager,
+		logger:              logger,
+		orderProcessor:      orderProcessor,
 	}
 }
 
 // GetUserProfile returns a user profile with orders
 // Uses multi-level caching strategy
 func (s *OrderService) GetUserProfile(ctx context.Context, userID string) (*models.UserProfileResponse, error) {
+	// If ProfileCacheService is available, use it
+	if s.profileCacheService != nil {
+		userIDInt, err := strconv.Atoi(userID)
+		if err != nil {
+			return nil, fmt.Errorf("invalid user ID: %w", err)
+		}
+
+		// Get user and orders from cache service
+		user, orders, err := s.profileCacheService.GetUserWithOrders(ctx, userIDInt)
+		if err != nil {
+			s.logger.Error("Failed to get user profile from cache service", "error", err, "userID", userID)
+			// Fall through to original implementation
+		} else {
+			// Convert to response format
+			return &models.UserProfileResponse{
+				UUID:   userID,
+				Name:   user.Email,
+				Email:  user.Email,
+				Orders: s.mapOrdersToProfileResponse(orders),
+			}, nil
+		}
+	}
+
+	// Original implementation as fallback
 	// First try to get profile from L1 cache (in-memory)
 	cachedProfile := s.profileCache.Get(userID)
 
@@ -403,6 +430,42 @@ func (s *OrderService) mapCacheProfileToResponse(profile *cache.Profile) *models
 
 // saveProfileToCache saves a user profile to L1 cache
 func (s *OrderService) saveProfileToCache(profile *models.UserProfileResponse) {
+	// Use ProfileCacheService if available
+	if s.profileCacheService != nil {
+		userIDInt, err := strconv.Atoi(profile.UUID)
+		if err != nil {
+			s.logger.Error("Failed to convert user ID", "error", err, "userID", profile.UUID)
+			return
+		}
+
+		// Convert ProfileOrderResponse to Order models
+		orders := make([]models.Order, 0, len(profile.Orders))
+		for _, order := range profile.Orders {
+			orderIDInt, err := strconv.Atoi(order.UUID)
+			if err != nil {
+				continue
+			}
+
+			orders = append(orders, models.Order{
+				ID:         orderIDInt,
+				Status:     order.Status,
+				TotalPrice: order.Total,
+				CreatedAt:  order.CreatedAt,
+			})
+		}
+
+		// Create user model
+		user := &models.User{
+			ID:    userIDInt,
+			Email: profile.Email,
+		}
+
+		// Use worker pool to update cache
+		s.profileCacheService.UpdateUserCache(context.Background(), user, orders)
+		return
+	}
+
+	// Original implementation as fallback
 	// Convert response model to cache format
 	cachedOrders := make([]*cache.Order, len(profile.Orders))
 

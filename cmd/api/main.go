@@ -14,6 +14,7 @@ import (
 	"github.com/bookshop/api/internal/repository/postgres"
 	"github.com/bookshop/api/internal/repository/redis"
 	"github.com/bookshop/api/internal/server"
+	"github.com/bookshop/api/internal/service"
 	"github.com/bookshop/api/pkg/logger"
 )
 
@@ -52,10 +53,19 @@ func main() {
 	bookRepo := postgres.NewBookRepository(db)
 	categoryRepo := postgres.NewCategoryRepository(db)
 	orderRepo := postgres.NewOrderRepository(db)
+	userRepo := postgres.NewUserRepository(db)
 	cartRepo := redis.NewCartRepository(redisClient)
 
 	// Log wrapper for modules
 	log := logger.Logger(*l)
+
+	// Initialize profile cache service with worker pool
+	profileCacheService := service.NewProfileCacheService(
+		userRepo,
+		orderRepo,
+		redisClient,
+		log,
+	)
 
 	// Initialize checkout module
 	checkoutModule := checkout.NewModule(
@@ -64,6 +74,7 @@ func main() {
 		bookRepo,
 		txManager,
 		log,
+		profileCacheService,
 	)
 
 	// Initialize cart module
@@ -106,6 +117,9 @@ func main() {
 	// Create a timeout context for graceful shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
+	// Shutdown the profile cache service
+	profileCacheService.Shutdown()
 
 	// Stop the server
 	if err := srv.Shutdown(ctx); err != nil {

@@ -20,6 +20,7 @@ type ProfileCacheService struct {
 	orderRepo   repositories.OrderRepository
 	redisClient *redis.Client
 	cache       *cache.ProfileCache
+	cacheWorker *cache.CacheWorker // Worker pool for cache operations
 	logger      logger.Logger
 }
 
@@ -33,11 +34,23 @@ func NewProfileCacheService(
 	// Create in-memory cache with 2-second TTL and 1-second cleanup interval
 	profileCache := cache.NewProfileCache(2*time.Second, 1*time.Second)
 
+	// Create cache worker with 3 workers
+	cacheWorker := cache.NewCacheWorker(
+		profileCache,
+		redisClient,
+		logger,
+		3, // Number of workers
+		func(userID string) string {
+			return fmt.Sprintf("user_profile:%s", userID)
+		},
+	)
+
 	return &ProfileCacheService{
 		userRepo:    userRepo,
 		orderRepo:   orderRepo,
 		redisClient: redisClient,
 		cache:       profileCache,
+		cacheWorker: cacheWorker,
 		logger:      logger,
 	}
 }
@@ -74,8 +87,8 @@ func (s *ProfileCacheService) GetUserWithOrders(ctx context.Context, userID int)
 		}
 
 		if err := json.Unmarshal(data, &cacheData); err == nil {
-			// Save to L1 cache for future requests
-			s.saveToL1Cache(&cacheData.User, cacheData.Orders)
+			// Save to L1 cache for future requests - use worker pool
+			go s.saveToL1Cache(&cacheData.User, cacheData.Orders)
 			return &cacheData.User, cacheData.Orders, nil
 		}
 
@@ -97,9 +110,21 @@ func (s *ProfileCacheService) GetUserWithOrders(ctx context.Context, userID int)
 		return nil, nil, fmt.Errorf("error fetching orders: %w", err)
 	}
 
-	// Save to caches
-	s.saveToL1Cache(user, orders)
-	s.saveToRedis(ctx, user, orders)
+	// Save to caches using worker pool
+	task := cache.CacheTask{
+		Operation: cache.OperationSet,
+		ProfileID: userIDStr,
+		Data: struct {
+			User   *models.User
+			Orders []models.Order
+		}{
+			User:   user,
+			Orders: orders,
+		},
+	}
+
+	// Submit task to worker pool but don't wait for completion
+	s.cacheWorker.ProcessTask(ctx, task)
 
 	return user, orders, nil
 }
@@ -108,14 +133,58 @@ func (s *ProfileCacheService) GetUserWithOrders(ctx context.Context, userID int)
 func (s *ProfileCacheService) InvalidateUserCache(ctx context.Context, userID int) {
 	userIDStr := strconv.Itoa(userID)
 
-	// Invalidate L1 cache
-	s.cache.Delete(userIDStr)
+	// Create delete task for worker pool
+	task := cache.CacheTask{
+		Operation: cache.OperationDelete,
+		ProfileID: userIDStr,
+	}
 
-	// Invalidate L2 cache (Redis)
-	redisKey := fmt.Sprintf("user_profile:%d", userID)
-	s.redisClient.Del(ctx, redisKey)
+	// Submit task to worker pool but don't wait for completion
+	s.cacheWorker.ProcessTask(ctx, task)
 
-	s.logger.Debug("User cache invalidated", "userID", userIDStr)
+	s.logger.Debug("User cache invalidation submitted to worker pool", "userID", userIDStr)
+}
+
+// UpdateUserCache updates user's cache when their data changes
+func (s *ProfileCacheService) UpdateUserCache(ctx context.Context, user *models.User, orders []models.Order) {
+	userIDStr := strconv.Itoa(user.ID)
+
+	// Create update task for worker pool
+	task := cache.CacheTask{
+		Operation: cache.OperationSet,
+		ProfileID: userIDStr,
+		Data: struct {
+			User   *models.User
+			Orders []models.Order
+		}{
+			User:   user,
+			Orders: orders,
+		},
+	}
+
+	// Submit task to worker pool but don't wait for completion
+	s.cacheWorker.ProcessTask(ctx, task)
+
+	s.logger.Debug("User cache update submitted to worker pool", "userID", userIDStr)
+}
+
+// UpdateOrderInCache updates a specific order in the cache
+func (s *ProfileCacheService) UpdateOrderInCache(ctx context.Context, userID int, order *models.Order) {
+	userIDStr := strconv.Itoa(userID)
+	orderIDStr := strconv.Itoa(order.ID)
+
+	// Create update task for worker pool
+	task := cache.CacheTask{
+		Operation: cache.OperationUpdate,
+		ProfileID: userIDStr,
+		OrderID:   orderIDStr,
+		Data:      order,
+	}
+
+	// Submit task to worker pool but don't wait for completion
+	s.cacheWorker.ProcessTask(ctx, task)
+
+	s.logger.Debug("Order cache update submitted to worker pool", "userID", userIDStr, "orderID", orderIDStr)
 }
 
 // convertCacheToModels converts a cached profile to domain models
@@ -213,8 +282,13 @@ func (s *ProfileCacheService) saveToRedis(ctx context.Context, user *models.User
 	}
 }
 
-// Shutdown stops the cache service
+// Shutdown stops the ProfileCacheService and its worker pool
 func (s *ProfileCacheService) Shutdown() {
-	s.cache.Stop()
-	s.logger.Info("Profile cache service stopped")
+	// Stop the worker pool
+	s.cacheWorker.Shutdown()
+
+	// Stop the L1 cache cleanup
+	s.cache.Shutdown()
+
+	s.logger.Info("ProfileCacheService has been shut down")
 }

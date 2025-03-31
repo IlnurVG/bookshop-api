@@ -4,6 +4,7 @@ import (
 	"github.com/bookshop/api/internal/domain/repositories"
 	"github.com/bookshop/api/internal/domain/services"
 	"github.com/bookshop/api/internal/handlers"
+	"github.com/bookshop/api/internal/service"
 	"github.com/bookshop/api/pkg/logger"
 	"github.com/labstack/echo/v4"
 )
@@ -21,9 +22,10 @@ func NewModule(
 	bookRepo repositories.BookRepository,
 	txManager repositories.TransactionManager,
 	logger logger.Logger,
+	profileCacheService *service.ProfileCacheService,
 ) *Module {
 	// Create service
-	service := NewService(orderRepo, cartRepo, bookRepo, txManager, logger)
+	service := NewService(orderRepo, cartRepo, bookRepo, txManager, logger, profileCacheService)
 
 	// Create handler
 	handler := handlers.NewCheckoutHandler(service)

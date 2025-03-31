@@ -10,6 +10,7 @@ import (
 	"github.com/bookshop/api/internal/domain/models"
 	"github.com/bookshop/api/internal/domain/repositories"
 	"github.com/bookshop/api/internal/domain/services"
+	"github.com/bookshop/api/internal/service"
 	"github.com/bookshop/api/pkg/logger"
 )
 
@@ -26,11 +27,12 @@ const (
 
 // Service implements services.CheckoutService interface
 type Service struct {
-	orderRepo repositories.OrderRepository
-	cartRepo  repositories.CartRepository
-	bookRepo  repositories.BookRepository
-	txManager repositories.TransactionManager
-	logger    logger.Logger
+	orderRepo           repositories.OrderRepository
+	cartRepo            repositories.CartRepository
+	bookRepo            repositories.BookRepository
+	txManager           repositories.TransactionManager
+	logger              logger.Logger
+	profileCacheService *service.ProfileCacheService
 }
 
 // NewService creates a new instance of the checkout service
@@ -40,13 +42,15 @@ func NewService(
 	bookRepo repositories.BookRepository,
 	txManager repositories.TransactionManager,
 	logger logger.Logger,
+	profileCacheService *service.ProfileCacheService,
 ) services.CheckoutService {
 	return &Service{
-		orderRepo: orderRepo,
-		cartRepo:  cartRepo,
-		bookRepo:  bookRepo,
-		txManager: txManager,
-		logger:    logger,
+		orderRepo:           orderRepo,
+		cartRepo:            cartRepo,
+		bookRepo:            bookRepo,
+		txManager:           txManager,
+		logger:              logger,
+		profileCacheService: profileCacheService,
 	}
 }
 
@@ -138,6 +142,11 @@ func (s *Service) Checkout(ctx context.Context, userID int) (*models.Order, erro
 		return nil, err
 	}
 
+	// Invalidate user profile cache after successful order creation
+	if s.profileCacheService != nil {
+		s.profileCacheService.InvalidateUserCache(context.Background(), userID)
+	}
+
 	return order, nil
 }
 
@@ -173,9 +182,13 @@ func (s *Service) GetOrdersByUserID(ctx context.Context, userID int) ([]models.O
 
 // UpdateOrderStatus updates order status
 func (s *Service) UpdateOrderStatus(ctx context.Context, orderID int, status string) error {
-	return s.txManager.WithTransaction(ctx, func(txCtx context.Context) error {
+	var order *models.Order
+
+	err := s.txManager.WithTransaction(ctx, func(txCtx context.Context) error {
 		// Check if the order exists
-		if _, err := s.orderRepo.GetByID(txCtx, orderID); err != nil {
+		var err error
+		order, err = s.orderRepo.GetByID(txCtx, orderID)
+		if err != nil {
 			if errors.Is(err, repositories.ErrNotFound) {
 				return fmt.Errorf("order not found")
 			}
@@ -195,6 +208,21 @@ func (s *Service) UpdateOrderStatus(ctx context.Context, orderID int, status str
 			return fmt.Errorf("error updating order status: %w", err)
 		}
 
+		// Update order status in our local variable
+		order.Status = status
+
 		return nil
 	})
+
+	if err != nil {
+		return err
+	}
+
+	// Update the cache after successful status update
+	if s.profileCacheService != nil && order != nil {
+		// Update the specific order in cache
+		s.profileCacheService.UpdateOrderInCache(context.Background(), order.UserID, order)
+	}
+
+	return nil
 }
