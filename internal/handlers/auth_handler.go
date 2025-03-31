@@ -8,159 +8,93 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// AuthHandler обрабатывает запросы, связанные с аутентификацией
+// AuthHandler handles authentication-related requests
 type AuthHandler struct {
 	authService services.AuthService
 }
 
-// NewAuthHandler создает новый экземпляр AuthHandler
+// NewAuthHandler creates a new instance of AuthHandler
 func NewAuthHandler(authService services.AuthService) *AuthHandler {
 	return &AuthHandler{
 		authService: authService,
 	}
 }
 
-// RegisterRoutes регистрирует маршруты для обработки аутентификации
-func (h *AuthHandler) RegisterRoutes(router *echo.Group) {
-	auth := router.Group("/auth")
-
-	auth.POST("/register", h.register)
-	auth.POST("/login", h.login)
-	auth.POST("/refresh", h.refreshToken)
+// RegisterRoutes registers routes for authentication handling
+func (h *AuthHandler) RegisterRoutes(e *echo.Echo) {
+	e.POST("/api/register", h.register)
+	e.POST("/api/login", h.login)
 }
 
-// register обрабатывает запрос на регистрацию нового пользователя
-// @Summary Регистрация пользователя
-// @Description Регистрирует нового пользователя
-// @Tags auth
+// register handles user registration
+// @Summary Register a new user
+// @Description Creates a new user account
+// @Tags authentication
 // @Accept json
 // @Produce json
-// @Param user body models.UserRegistration true "Данные пользователя"
-// @Success 201 {object} models.UserResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 409 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
-// @Router /auth/register [post]
+// @Param user body models.UserRegistration true "User registration data"
+// @Success 201 {object} models.User
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 409 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /api/register [post]
 func (h *AuthHandler) register(c echo.Context) error {
-	var req models.UserRegistration
-	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "неверный формат запроса"})
+	var input models.UserRegistration
+	if err := c.Bind(&input); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid request format")
 	}
 
-	// Валидация запроса
-	if err := c.Validate(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
-	}
-
-	// Регистрация пользователя
-	user, err := h.authService.Register(c.Request().Context(), req)
+	// Create user
+	user, err := h.authService.Register(c.Request().Context(), input)
 	if err != nil {
-		// Проверяем тип ошибки
-		if err.Error() == "пользователь с таким email уже существует" {
-			return c.JSON(http.StatusConflict, map[string]string{"error": err.Error()})
-		}
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to register user")
 	}
 
-	return c.JSON(http.StatusCreated, user.ToResponse())
+	return c.JSON(http.StatusCreated, user)
 }
 
-// login обрабатывает запрос на аутентификацию пользователя
-// @Summary Вход пользователя
-// @Description Аутентифицирует пользователя и возвращает токены
-// @Tags auth
+// login handles user login
+// @Summary Log in a user
+// @Description Authenticates a user and returns a token
+// @Tags authentication
 // @Accept json
 // @Produce json
-// @Param credentials body models.UserCredentials true "Учетные данные"
+// @Param credentials body models.UserCredentials true "Login credentials"
 // @Success 200 {object} TokenResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 401 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
-// @Router /auth/login [post]
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /api/login [post]
 func (h *AuthHandler) login(c echo.Context) error {
-	var req models.UserCredentials
-	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "неверный формат запроса"})
+	var input models.UserCredentials
+	if err := c.Bind(&input); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "Invalid request format")
 	}
 
-	// Валидация запроса
-	if err := c.Validate(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
-	}
-
-	// Аутентификация пользователя
-	accessToken, refreshToken, err := h.authService.Login(c.Request().Context(), req)
+	// Authenticate user
+	accessToken, refreshToken, err := h.authService.Login(c.Request().Context(), input)
 	if err != nil {
-		// Проверяем тип ошибки
-		if err.Error() == "неверные учетные данные" {
-			return c.JSON(http.StatusUnauthorized, map[string]string{"error": err.Error()})
-		}
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return echo.NewHTTPError(http.StatusUnauthorized, "Invalid credentials")
 	}
 
-	// Формируем ответ
-	response := map[string]string{
-		"access_token":  accessToken,
-		"refresh_token": refreshToken,
-	}
-
-	return c.JSON(http.StatusOK, response)
+	return c.JSON(http.StatusOK, TokenResponse{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	})
 }
 
-// refreshToken обрабатывает запрос на обновление токена
-// @Summary Обновление токена
-// @Description Обновляет токен доступа с помощью токена обновления
-// @Tags auth
-// @Accept json
-// @Produce json
-// @Param refresh_token body RefreshTokenRequest true "Токен обновления"
-// @Success 200 {object} TokenResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 401 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
-// @Router /auth/refresh [post]
-func (h *AuthHandler) refreshToken(c echo.Context) error {
-	var req RefreshTokenRequest
-	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "неверный формат запроса"})
-	}
-
-	// Валидация запроса
-	if err := c.Validate(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
-	}
-
-	// Обновление токена
-	accessToken, refreshToken, err := h.authService.RefreshToken(c.Request().Context(), req.RefreshToken)
-	if err != nil {
-		// Проверяем тип ошибки
-		if err.Error() == "недействительный токен" || err.Error() == "срок действия токена истек" {
-			return c.JSON(http.StatusUnauthorized, map[string]string{"error": err.Error()})
-		}
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
-	}
-
-	// Формируем ответ
-	response := map[string]string{
-		"access_token":  accessToken,
-		"refresh_token": refreshToken,
-	}
-
-	return c.JSON(http.StatusOK, response)
-}
-
-// RefreshTokenRequest представляет запрос на обновление токена
+// RefreshTokenRequest represents a request to refresh a token
 type RefreshTokenRequest struct {
 	RefreshToken string `json:"refresh_token" validate:"required"`
 }
 
-// TokenResponse представляет ответ с токенами
+// TokenResponse represents a response with tokens
 type TokenResponse struct {
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 }
 
-// ErrorResponse представляет ответ с ошибкой
+// ErrorResponse represents a response with an error
 type ErrorResponse struct {
 	Error string `json:"error"`
 }

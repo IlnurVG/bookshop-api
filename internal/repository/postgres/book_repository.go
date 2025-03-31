@@ -13,19 +13,19 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// BookRepository реализует интерфейс repositories.BookRepository
+// BookRepository implements repositories.BookRepository interface
 type BookRepository struct {
 	db *pgxpool.Pool
 }
 
-// NewBookRepository создает новый экземпляр BookRepository
+// NewBookRepository creates a new instance of BookRepository
 func NewBookRepository(db *pgxpool.Pool) repositories.BookRepository {
 	return &BookRepository{
 		db: db,
 	}
 }
 
-// Create создает новую книгу
+// Create creates a new book
 func (r *BookRepository) Create(ctx context.Context, book *models.Book) error {
 	query := `
 		INSERT INTO books (
@@ -51,13 +51,13 @@ func (r *BookRepository) Create(ctx context.Context, book *models.Book) error {
 	).Scan(&book.ID)
 
 	if err != nil {
-		return fmt.Errorf("ошибка создания книги: %w", err)
+		return fmt.Errorf("failed to create book: %w", err)
 	}
 
 	return nil
 }
 
-// GetByID возвращает книгу по ID
+// GetByID returns a book by ID
 func (r *BookRepository) GetByID(ctx context.Context, id int) (*models.Book, error) {
 	query := `
 		SELECT 
@@ -86,9 +86,9 @@ func (r *BookRepository) GetByID(ctx context.Context, id int) (*models.Book, err
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("книга не найдена")
+			return nil, repositories.ErrNotFound
 		}
-		return nil, fmt.Errorf("ошибка получения книги: %w", err)
+		return nil, fmt.Errorf("failed to get book: %w", err)
 	}
 
 	if categoryName != "" {
@@ -101,16 +101,16 @@ func (r *BookRepository) GetByID(ctx context.Context, id int) (*models.Book, err
 	return book, nil
 }
 
-// List возвращает список книг с фильтрацией и пагинацией
+// List returns a list of books with filtering and pagination
 func (r *BookRepository) List(ctx context.Context, filter models.BookFilter) ([]models.Book, int, error) {
-	// Базовый запрос для получения книг
+	// Base query to get books
 	baseQuery := `
 		FROM books b
 		LEFT JOIN categories c ON b.category_id = c.id
 		WHERE 1=1
 	`
 
-	// Добавляем условия фильтрации
+	// Add filtering conditions
 	var conditions string
 	var args []interface{}
 	argIndex := 1
@@ -144,18 +144,18 @@ func (r *BookRepository) List(ctx context.Context, filter models.BookFilter) ([]
 		conditions += " AND b.stock > 0"
 	}
 
-	// Запрос для подсчета общего количества книг
+	// Query to count total number of books
 	countQuery := "SELECT COUNT(*) " + baseQuery + conditions
 	var total int
 	err := r.db.QueryRow(ctx, countQuery, args...).Scan(&total)
 	if err != nil {
-		return nil, 0, fmt.Errorf("ошибка подсчета книг: %w", err)
+		return nil, 0, fmt.Errorf("failed to count books: %w", err)
 	}
 
-	// Добавляем пагинацию
+	// Add pagination
 	pageSize := filter.PageSize
 	if pageSize <= 0 {
-		pageSize = 10 // Значение по умолчанию
+		pageSize = 10 // Default value
 	}
 
 	page := filter.Page
@@ -170,7 +170,7 @@ func (r *BookRepository) List(ctx context.Context, filter models.BookFilter) ([]
 
 	pagination := fmt.Sprintf(" ORDER BY b.id DESC LIMIT %d OFFSET %d", pageSize, offset)
 
-	// Запрос для получения книг с учетом фильтрации и пагинации
+	// Query to get books with filtering and pagination
 	query := `
 		SELECT 
 			b.id, b.title, b.author, b.year_published, b.price, 
@@ -180,7 +180,7 @@ func (r *BookRepository) List(ctx context.Context, filter models.BookFilter) ([]
 
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, 0, fmt.Errorf("ошибка получения списка книг: %w", err)
+		return nil, 0, fmt.Errorf("failed to query books list: %w", err)
 	}
 	defer rows.Close()
 
@@ -201,7 +201,7 @@ func (r *BookRepository) List(ctx context.Context, filter models.BookFilter) ([]
 			&categoryName,
 		)
 		if err != nil {
-			return nil, 0, fmt.Errorf("ошибка сканирования данных книги: %w", err)
+			return nil, 0, fmt.Errorf("failed to scan book row: %w", err)
 		}
 
 		if categoryName != "" {
@@ -215,13 +215,13 @@ func (r *BookRepository) List(ctx context.Context, filter models.BookFilter) ([]
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, 0, fmt.Errorf("ошибка при итерации по результатам: %w", err)
+		return nil, 0, fmt.Errorf("error iterating through results: %w", err)
 	}
 
 	return books, total, nil
 }
 
-// Update обновляет данные книги
+// Update updates a book
 func (r *BookRepository) Update(ctx context.Context, book *models.Book) error {
 	query := `
 		UPDATE books
@@ -244,13 +244,13 @@ func (r *BookRepository) Update(ctx context.Context, book *models.Book) error {
 	)
 
 	if err != nil {
-		return fmt.Errorf("ошибка обновления книги: %w", err)
+		return fmt.Errorf("failed to update book: %w", err)
 	}
 
 	return nil
 }
 
-// Delete удаляет книгу по ID
+// Delete deletes a book by ID
 func (r *BookRepository) Delete(ctx context.Context, id int) error {
 	query := `
 		DELETE FROM books
@@ -259,13 +259,13 @@ func (r *BookRepository) Delete(ctx context.Context, id int) error {
 
 	_, err := r.db.Exec(ctx, query, id)
 	if err != nil {
-		return fmt.Errorf("ошибка удаления книги: %w", err)
+		return fmt.Errorf("failed to delete book: %w", err)
 	}
 
 	return nil
 }
 
-// UpdateStock обновляет количество книг на складе
+// UpdateStock updates the stock of books
 func (r *BookRepository) UpdateStock(ctx context.Context, id int, quantity int) error {
 	query := `
 		UPDATE books
@@ -275,19 +275,19 @@ func (r *BookRepository) UpdateStock(ctx context.Context, id int, quantity int) 
 
 	_, err := r.db.Exec(ctx, query, quantity, time.Now(), id)
 	if err != nil {
-		return fmt.Errorf("ошибка обновления количества книг: %w", err)
+		return fmt.Errorf("failed to update book quantity: %w", err)
 	}
 
 	return nil
 }
 
-// GetBooksByIDs возвращает книги по списку ID
+// GetBooksByIDs returns books by list of IDs
 func (r *BookRepository) GetBooksByIDs(ctx context.Context, ids []int) ([]models.Book, error) {
 	if len(ids) == 0 {
 		return []models.Book{}, nil
 	}
 
-	// Создаем параметры для запроса
+	// Create parameters for query
 	args := make([]interface{}, len(ids))
 	placeholders := make([]string, len(ids))
 	for i, id := range ids {
@@ -307,7 +307,7 @@ func (r *BookRepository) GetBooksByIDs(ctx context.Context, ids []int) ([]models
 
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка получения книг по ID: %w", err)
+		return nil, fmt.Errorf("failed to get books by IDs: %w", err)
 	}
 	defer rows.Close()
 
@@ -328,7 +328,7 @@ func (r *BookRepository) GetBooksByIDs(ctx context.Context, ids []int) ([]models
 			&categoryName,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("ошибка сканирования данных книги: %w", err)
+			return nil, fmt.Errorf("failed to scan book row: %w", err)
 		}
 
 		if categoryName != "" {
@@ -342,17 +342,17 @@ func (r *BookRepository) GetBooksByIDs(ctx context.Context, ids []int) ([]models
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("ошибка при итерации по результатам: %w", err)
+		return nil, fmt.Errorf("error iterating through results: %w", err)
 	}
 
 	return books, nil
 }
 
-// ReserveBooks резервирует указанное количество книг
+// ReserveBooks reserves the specified number of books
 func (r *BookRepository) ReserveBooks(ctx context.Context, bookIDs []int) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("ошибка начала транзакции: %w", err)
+		return fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer tx.Rollback(ctx)
 
@@ -368,24 +368,24 @@ func (r *BookRepository) ReserveBooks(ctx context.Context, bookIDs []int) error 
 		err := tx.QueryRow(ctx, query, time.Now(), bookID).Scan(&remainingStock)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				return fmt.Errorf("недостаточно книг на складе для ID: %d", bookID)
+				return fmt.Errorf("not enough books on stock for ID: %d", bookID)
 			}
-			return fmt.Errorf("ошибка резервирования книги: %w", err)
+			return fmt.Errorf("failed to reserve book: %w", err)
 		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("ошибка фиксации транзакции: %w", err)
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil
 }
 
-// ReleaseBooks возвращает зарезервированные книги обратно на склад
+// ReleaseBooks returns reserved books back to stock
 func (r *BookRepository) ReleaseBooks(ctx context.Context, bookIDs []int) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("ошибка начала транзакции: %w", err)
+		return fmt.Errorf("failed to start transaction: %w", err)
 	}
 	defer tx.Rollback(ctx)
 
@@ -398,12 +398,12 @@ func (r *BookRepository) ReleaseBooks(ctx context.Context, bookIDs []int) error 
 
 		_, err := tx.Exec(ctx, query, time.Now(), bookID)
 		if err != nil {
-			return fmt.Errorf("ошибка возврата книги на склад: %w", err)
+			return fmt.Errorf("failed to return book to stock: %w", err)
 		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("ошибка фиксации транзакции: %w", err)
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil

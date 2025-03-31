@@ -1,32 +1,51 @@
-# Бинарные файлы
+# Binary files
+bin/
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
+
+# Test binary, built with `go test -c`
 *.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
-# Директории для кэширования и зависимостей
+# Dependency directories
+vendor/
+go.sum
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Log files
+*.log
+
+# Local configuration files
+.env
+.env.local
+*.local.yaml
+*.local.yml
+
+# Go compiled files
+*.o
+*.a
+*.lib
+/api
+/bookshop-api
+
+# Cache and dependency directories
 /vendor/
 /.idea/
 /.vscode/
 /bin/
 /dist/
 
-# Файлы логов
-*.log
-
-# Локальные конфигурационные файлы
-.env
-*.local.yaml
-*.local.yml
-
-# Скомпилированные файлы Go
-/api
-/bookshop-api
-
-# Временные файлы
+# Temporary files
 .DS_Store
 Thumbs.db
 .tmp/

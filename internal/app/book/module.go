@@ -6,21 +6,21 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// Module представляет модуль для работы с книгами
+// Module represents a book management module
 type Module struct {
 	Handler *Handler
 	Service services.BookService
 }
 
-// NewModule создает новый экземпляр модуля для работы с книгами
+// NewModule creates a new instance of the book module
 func NewModule(
 	bookRepo repositories.BookRepository,
 	categoryRepo repositories.CategoryRepository,
 ) *Module {
-	// Создаем сервис
+	// Create service
 	service := NewService(bookRepo, categoryRepo)
 
-	// Создаем обработчик
+	// Create handler
 	handler := NewHandler(service)
 
 	return &Module{
@@ -29,7 +29,7 @@ func NewModule(
 	}
 }
 
-// RegisterRoutes регистрирует маршруты для обработки запросов к книгам
+// RegisterRoutes registers routes for book request handling
 func (m *Module) RegisterRoutes(router *echo.Group) {
 	m.Handler.RegisterRoutes(router)
 }

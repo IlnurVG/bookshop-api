@@ -1,65 +1,81 @@
 package logger
 
 import (
-	"fmt"
-
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-// Logger представляет интерфейс для логирования
+// Logger represents the logging interface
 type Logger struct {
-	*zap.SugaredLogger
+	*zap.Logger
 }
 
-// NewLogger создает новый экземпляр логгера
+// NewLogger creates a new logger instance
 func NewLogger(level string) (*Logger, error) {
-	var zapLevel zapcore.Level
-	if err := zapLevel.UnmarshalText([]byte(level)); err != nil {
-		zapLevel = zapcore.InfoLevel
+	config := zap.NewProductionConfig()
+
+	// Set log level
+	switch level {
+	case "debug":
+		config.Level = zap.NewAtomicLevelAt(zapcore.DebugLevel)
+	case "info":
+		config.Level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
+	case "warn":
+		config.Level = zap.NewAtomicLevelAt(zapcore.WarnLevel)
+	case "error":
+		config.Level = zap.NewAtomicLevelAt(zapcore.ErrorLevel)
+	default:
+		config.Level = zap.NewAtomicLevelAt(zapcore.InfoLevel)
 	}
 
-	config := zap.Config{
-		Level:             zap.NewAtomicLevelAt(zapLevel),
-		Development:       false,
-		Encoding:          "json",
-		EncoderConfig:     zap.NewProductionEncoderConfig(),
-		OutputPaths:       []string{"stdout"},
-		ErrorOutputPaths:  []string{"stderr"},
-		DisableCaller:     false,
-		DisableStacktrace: false,
-	}
+	// Configure output format
+	config.Encoding = "json"
+	config.OutputPaths = []string{"stdout"}
+	config.ErrorOutputPaths = []string{"stderr"}
 
+	// Create logger
 	logger, err := config.Build()
 	if err != nil {
-		return nil, fmt.Errorf("ошибка инициализации zap логгера: %w", err)
+		return nil, err
 	}
 
-	sugar := logger.Sugar()
-	return &Logger{sugar}, nil
+	return &Logger{logger}, nil
 }
 
-// Fatal логирует сообщение с уровнем Fatal и завершает программу
+// Fatal logs a message with Fatal level and exits the program
 func (l *Logger) Fatal(msg string, err error) {
-	l.Fatalw(msg, "error", err)
+	l.Logger.Fatal(msg, zap.Error(err))
 }
 
-// Error логирует сообщение с уровнем Error
+// Error logs a message with Error level
 func (l *Logger) Error(msg string, err error) {
-	l.Errorw(msg, "error", err)
+	l.Logger.Error(msg, zap.Error(err))
 }
 
-// Info логирует сообщение с уровнем Info
-func (l *Logger) Info(msg string, args ...interface{}) {
-	l.Infow(msg, args...)
+// Info logs a message with Info level
+func (l *Logger) Info(msg string, fields ...interface{}) {
+	if len(fields) > 0 {
+		var zapFields []zap.Field
+		for i := 0; i < len(fields); i += 2 {
+			if i+1 < len(fields) {
+				key, ok := fields[i].(string)
+				if ok {
+					zapFields = append(zapFields, zap.Any(key, fields[i+1]))
+				}
+			}
+		}
+		l.Logger.Info(msg, zapFields...)
+	} else {
+		l.Logger.Info(msg)
+	}
 }
 
-// Debug логирует сообщение с уровнем Debug
-func (l *Logger) Debug(msg string, args ...interface{}) {
-	l.Debugw(msg, args...)
+// Debug logs a message with Debug level
+func (l *Logger) Debug(msg string) {
+	l.Logger.Debug(msg)
 }
 
-// Warn логирует сообщение с уровнем Warn
-func (l *Logger) Warn(msg string, args ...interface{}) {
-	l.Warnw(msg, args...)
+// Warn logs a message with Warn level
+func (l *Logger) Warn(msg string) {
+	l.Logger.Warn(msg)
 }

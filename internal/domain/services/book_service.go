@@ -6,24 +6,23 @@ import (
 	"github.com/bookshop/api/internal/domain/models"
 )
 
-// BookService определяет методы для работы с книгами
+// BookService defines methods for working with books
 type BookService interface {
-	// Create создает новую книгу
+	// Create creates a new book
 	Create(ctx context.Context, input models.BookCreate) (*models.Book, error)
 
-	// GetByID возвращает книгу по ID
+	// GetByID returns a book by ID
 	GetByID(ctx context.Context, id int) (*models.Book, error)
 
-	// List возвращает список книг с фильтрацией
+	// List returns a list of books with filtering
 	List(ctx context.Context, filter models.BookFilter) (*models.BookListResponse, error)
 
-	// Update обновляет данные книги
+	// Update updates book data
 	Update(ctx context.Context, id int, input models.BookUpdate) (*models.Book, error)
 
-	// Delete удаляет книгу по ID
+	// Delete deletes a book by ID
 	Delete(ctx context.Context, id int) error
 
-	// GetBooksByIDs возвращает книги по списку ID
+	// GetBooksByIDs returns books by a list of IDs
 	GetBooksByIDs(ctx context.Context, ids []int) ([]models.Book, error)
 }
-

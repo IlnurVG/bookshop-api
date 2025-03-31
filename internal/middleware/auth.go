@@ -8,59 +8,59 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// JWTConfig содержит настройки для JWT аутентификации
+// JWTConfig contains settings for JWT authentication
 type JWTConfig struct {
 	SecretKey string
 }
 
-// NewJWTConfig создает новый экземпляр JWTConfig
+// NewJWTConfig creates a new instance of JWTConfig
 func NewJWTConfig(secretKey string) *JWTConfig {
 	return &JWTConfig{
 		SecretKey: secretKey,
 	}
 }
 
-// AuthMiddleware создает middleware для проверки JWT токена
+// AuthMiddleware creates middleware for JWT token validation
 func AuthMiddleware(config *JWTConfig) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			// Получаем токен из заголовка Authorization
+			// Get token from Authorization header
 			authHeader := c.Request().Header.Get("Authorization")
 			if authHeader == "" {
-				return c.JSON(http.StatusUnauthorized, map[string]string{"error": "отсутствует токен авторизации"})
+				return c.JSON(http.StatusUnauthorized, map[string]string{"error": "missing authorization token"})
 			}
 
-			// Проверяем формат токена
+			// Check token format
 			parts := strings.Split(authHeader, " ")
 			if len(parts) != 2 || parts[0] != "Bearer" {
-				return c.JSON(http.StatusUnauthorized, map[string]string{"error": "неверный формат токена"})
+				return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid token format"})
 			}
 
-			// Парсим токен
+			// Parse token
 			token, err := jwt.Parse(parts[1], func(token *jwt.Token) (interface{}, error) {
-				// Проверяем метод подписи
+				// Check signing method
 				if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-					return nil, echo.NewHTTPError(http.StatusUnauthorized, "неверный метод подписи")
+					return nil, echo.NewHTTPError(http.StatusUnauthorized, "invalid signing method")
 				}
 				return []byte(config.SecretKey), nil
 			})
 
 			if err != nil {
-				return c.JSON(http.StatusUnauthorized, map[string]string{"error": "неверный токен: " + err.Error()})
+				return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid token: " + err.Error()})
 			}
 
-			// Проверяем валидность токена
+			// Verify token validity
 			if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-				// Получаем ID пользователя из токена
+				// Get user ID from token
 				userID, ok := claims["user_id"].(float64)
 				if !ok {
-					return c.JSON(http.StatusUnauthorized, map[string]string{"error": "неверный формат ID пользователя"})
+					return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid user ID format"})
 				}
 
-				// Сохраняем ID пользователя в контексте
+				// Save user ID in context
 				c.Set("userID", int(userID))
 
-				// Проверяем роль пользователя, если она есть
+				// Check user role if present
 				if role, ok := claims["role"].(string); ok {
 					c.Set("userRole", role)
 				}
@@ -68,19 +68,19 @@ func AuthMiddleware(config *JWTConfig) echo.MiddlewareFunc {
 				return next(c)
 			}
 
-			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "неверный токен"})
+			return c.JSON(http.StatusUnauthorized, map[string]string{"error": "invalid token"})
 		}
 	}
 }
 
-// AdminMiddleware создает middleware для проверки роли администратора
+// AdminMiddleware creates middleware for checking admin role
 func AdminMiddleware() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			// Получаем роль пользователя из контекста
+			// Get user role from context
 			role, ok := c.Get("userRole").(string)
 			if !ok || role != "admin" {
-				return c.JSON(http.StatusForbidden, map[string]string{"error": "доступ запрещен"})
+				return c.JSON(http.StatusForbidden, map[string]string{"error": "access denied"})
 			}
 
 			return next(c)

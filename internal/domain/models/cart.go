@@ -2,7 +2,7 @@ package models
 
 import "time"
 
-// CartItem представляет элемент корзины
+// CartItem represents a cart item
 type CartItem struct {
 	BookID    int       `json:"book_id" db:"book_id"`
 	Book      *Book     `json:"book,omitempty" db:"-"`
@@ -10,24 +10,24 @@ type CartItem struct {
 	ExpiresAt time.Time `json:"expires_at" db:"expires_at"`
 }
 
-// Cart представляет корзину пользователя
+// Cart represents a user's shopping cart
 type Cart struct {
 	UserID int        `json:"user_id" db:"user_id"`
 	Items  []CartItem `json:"items" db:"-"`
 }
 
-// CartItemRequest представляет запрос на добавление товара в корзину
+// CartItemRequest represents a request to add an item to the cart
 type CartItemRequest struct {
 	BookID int `json:"book_id" validate:"required,gt=0"`
 }
 
-// CartResponse представляет ответ с корзиной
+// CartResponse represents a cart response
 type CartResponse struct {
 	Items     []CartItemResponse `json:"items"`
 	TotalCost float64            `json:"total_cost"`
 }
 
-// CartItemResponse представляет элемент корзины в ответе API
+// CartItemResponse represents a cart item in API response
 type CartItemResponse struct {
 	BookID    int       `json:"book_id"`
 	Title     string    `json:"title"`
@@ -37,7 +37,7 @@ type CartItemResponse struct {
 	ExpiresAt time.Time `json:"expires_at"`
 }
 
-// ToResponse преобразует корзину в ответ API
+// ToResponse converts a cart to API response
 func (c *Cart) ToResponse() CartResponse {
 	var response CartResponse
 	var totalCost float64

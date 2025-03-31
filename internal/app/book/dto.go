@@ -6,7 +6,7 @@ import (
 	"github.com/bookshop/api/internal/domain/models"
 )
 
-// CreateBookRequest представляет запрос на создание книги
+// CreateBookRequest represents a book creation request
 type CreateBookRequest struct {
 	Title         string  `json:"title" validate:"required"`
 	Author        string  `json:"author" validate:"required"`
@@ -16,7 +16,7 @@ type CreateBookRequest struct {
 	CategoryID    int     `json:"category_id" validate:"required,gt=0"`
 }
 
-// ToModel преобразует CreateBookRequest в модель BookCreate
+// ToModel converts CreateBookRequest to BookCreate model
 func (r *CreateBookRequest) ToModel() models.BookCreate {
 	return models.BookCreate{
 		Title:         r.Title,
@@ -28,7 +28,7 @@ func (r *CreateBookRequest) ToModel() models.BookCreate {
 	}
 }
 
-// UpdateBookRequest представляет запрос на обновление книги
+// UpdateBookRequest represents a book update request
 type UpdateBookRequest struct {
 	Title         *string  `json:"title,omitempty"`
 	Author        *string  `json:"author,omitempty"`
@@ -37,7 +37,7 @@ type UpdateBookRequest struct {
 	CategoryID    *int     `json:"category_id,omitempty" validate:"omitempty,gt=0"`
 }
 
-// ToModel преобразует UpdateBookRequest в модель BookUpdate
+// ToModel converts UpdateBookRequest to BookUpdate model
 func (r *UpdateBookRequest) ToModel() models.BookUpdate {
 	return models.BookUpdate{
 		Title:         r.Title,
@@ -48,7 +48,7 @@ func (r *UpdateBookRequest) ToModel() models.BookUpdate {
 	}
 }
 
-// BookResponse представляет ответ с информацией о книге
+// BookResponse represents a response with book information
 type BookResponse struct {
 	ID            int       `json:"id"`
 	Title         string    `json:"title"`
@@ -62,13 +62,13 @@ type BookResponse struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 }
 
-// Category представляет информацию о категории книги
+// Category represents book category information
 type Category struct {
 	ID   int    `json:"id"`
 	Name string `json:"name"`
 }
 
-// FromModel преобразует модель Book в BookResponse
+// FromModel converts Book model to BookResponse
 func FromModel(book *models.Book) *BookResponse {
 	response := &BookResponse{
 		ID:            book.ID,
@@ -92,7 +92,7 @@ func FromModel(book *models.Book) *BookResponse {
 	return response
 }
 
-// BookListRequest представляет запрос на получение списка книг
+// BookListRequest represents a request for getting a list of books
 type BookListRequest struct {
 	CategoryIDs []int    `form:"category_ids"`
 	MinPrice    *float64 `form:"min_price"`
@@ -102,7 +102,7 @@ type BookListRequest struct {
 	PageSize    int      `form:"page_size,default=10"`
 }
 
-// ToModel преобразует BookListRequest в модель BookFilter
+// ToModel converts BookListRequest to BookFilter model
 func (r *BookListRequest) ToModel() models.BookFilter {
 	return models.BookFilter{
 		CategoryIDs: r.CategoryIDs,
@@ -114,7 +114,7 @@ func (r *BookListRequest) ToModel() models.BookFilter {
 	}
 }
 
-// BookListResponse представляет ответ со списком книг
+// BookListResponse represents a response with a list of books
 type BookListResponse struct {
 	Books      []BookResponse `json:"books"`
 	TotalCount int            `json:"total_count"`
@@ -123,7 +123,7 @@ type BookListResponse struct {
 	TotalPages int            `json:"total_pages"`
 }
 
-// FromModelList преобразует модель BookListResponse в BookListResponse
+// FromModelList converts BookListResponse model to BookListResponse
 func FromModelList(modelResponse *models.BookListResponse) *BookListResponse {
 	response := &BookListResponse{
 		TotalCount: modelResponse.TotalCount,
@@ -134,7 +134,7 @@ func FromModelList(modelResponse *models.BookListResponse) *BookListResponse {
 	}
 
 	for _, book := range modelResponse.Books {
-		bookCopy := book // Создаем копию, чтобы избежать проблем с указателями
+		bookCopy := book // Create a copy to avoid pointer issues
 		response.Books = append(response.Books, *FromModel(&bookCopy))
 	}
 

@@ -12,23 +12,23 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// OrderRepository реализует интерфейс repositories.OrderRepository
+// OrderRepository implements repositories.OrderRepository interface
 type OrderRepository struct {
 	db *pgxpool.Pool
 }
 
-// NewOrderRepository создает новый экземпляр OrderRepository
+// NewOrderRepository creates a new instance of OrderRepository
 func NewOrderRepository(db *pgxpool.Pool) repositories.OrderRepository {
 	return &OrderRepository{
 		db: db,
 	}
 }
 
-// Create создает новый заказ
+// Create creates a new order
 func (r *OrderRepository) Create(ctx context.Context, order *models.Order) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("ошибка начала транзакции: %w", err)
+		return fmt.Errorf("error starting transaction: %w", err)
 	}
 	defer tx.Rollback(ctx)
 
@@ -51,10 +51,10 @@ func (r *OrderRepository) Create(ctx context.Context, order *models.Order) error
 	).Scan(&order.ID)
 
 	if err != nil {
-		return fmt.Errorf("ошибка создания заказа: %w", err)
+		return fmt.Errorf("error creating order: %w", err)
 	}
 
-	// Добавляем товары в заказ
+	// Add items to order
 	for i := range order.Items {
 		item := &order.Items[i]
 		item.OrderID = order.ID
@@ -74,18 +74,18 @@ func (r *OrderRepository) Create(ctx context.Context, order *models.Order) error
 		).Scan(&item.ID)
 
 		if err != nil {
-			return fmt.Errorf("ошибка добавления товара в заказ: %w", err)
+			return fmt.Errorf("error adding item to order: %w", err)
 		}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("ошибка фиксации транзакции: %w", err)
+		return fmt.Errorf("error committing transaction: %w", err)
 	}
 
 	return nil
 }
 
-// GetByID возвращает заказ по ID
+// GetByID returns an order by ID
 func (r *OrderRepository) GetByID(ctx context.Context, id int) (*models.Order, error) {
 	query := `
 		SELECT id, user_id, status, total_price, created_at, updated_at
@@ -105,12 +105,12 @@ func (r *OrderRepository) GetByID(ctx context.Context, id int) (*models.Order, e
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("заказ не найден")
+			return nil, fmt.Errorf("order not found")
 		}
-		return nil, fmt.Errorf("ошибка получения заказа: %w", err)
+		return nil, fmt.Errorf("error getting order: %w", err)
 	}
 
-	// Получаем товары заказа
+	// Get order items
 	items, err := r.GetOrderItems(ctx, order.ID)
 	if err != nil {
 		return nil, err
@@ -120,7 +120,7 @@ func (r *OrderRepository) GetByID(ctx context.Context, id int) (*models.Order, e
 	return order, nil
 }
 
-// GetByUserID возвращает список заказов пользователя
+// GetByUserID returns a list of user's orders
 func (r *OrderRepository) GetByUserID(ctx context.Context, userID int) ([]models.Order, error) {
 	query := `
 		SELECT id, user_id, status, total_price, created_at, updated_at
@@ -131,7 +131,7 @@ func (r *OrderRepository) GetByUserID(ctx context.Context, userID int) ([]models
 
 	rows, err := r.db.Query(ctx, query, userID)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка получения заказов пользователя: %w", err)
+		return nil, fmt.Errorf("error getting user orders: %w", err)
 	}
 	defer rows.Close()
 
@@ -147,16 +147,16 @@ func (r *OrderRepository) GetByUserID(ctx context.Context, userID int) ([]models
 			&order.UpdatedAt,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("ошибка сканирования данных заказа: %w", err)
+			return nil, fmt.Errorf("error scanning order data: %w", err)
 		}
 		orders = append(orders, order)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("ошибка при итерации по результатам: %w", err)
+		return nil, fmt.Errorf("error iterating over results: %w", err)
 	}
 
-	// Получаем товары для каждого заказа
+	// Get items for each order
 	for i := range orders {
 		items, err := r.GetOrderItems(ctx, orders[i].ID)
 		if err != nil {
@@ -168,7 +168,7 @@ func (r *OrderRepository) GetByUserID(ctx context.Context, userID int) ([]models
 	return orders, nil
 }
 
-// UpdateStatus обновляет статус заказа
+// UpdateStatus updates order status
 func (r *OrderRepository) UpdateStatus(ctx context.Context, id int, status string) error {
 	query := `
 		UPDATE orders
@@ -178,13 +178,13 @@ func (r *OrderRepository) UpdateStatus(ctx context.Context, id int, status strin
 
 	_, err := r.db.Exec(ctx, query, status, time.Now(), id)
 	if err != nil {
-		return fmt.Errorf("ошибка обновления статуса заказа: %w", err)
+		return fmt.Errorf("error updating order status: %w", err)
 	}
 
 	return nil
 }
 
-// AddOrderItem добавляет товар в заказ
+// AddOrderItem adds an item to the order
 func (r *OrderRepository) AddOrderItem(ctx context.Context, orderID int, item models.OrderItem) error {
 	query := `
 		INSERT INTO order_items (order_id, book_id, price, created_at)
@@ -203,10 +203,10 @@ func (r *OrderRepository) AddOrderItem(ctx context.Context, orderID int, item mo
 	).Scan(&item.ID)
 
 	if err != nil {
-		return fmt.Errorf("ошибка добавления товара в заказ: %w", err)
+		return fmt.Errorf("error adding item to order: %w", err)
 	}
 
-	// Обновляем общую стоимость заказа
+	// Update the total order price
 	updateQuery := `
 		UPDATE orders
 		SET total_price = total_price + $1, updated_at = $2
@@ -215,13 +215,13 @@ func (r *OrderRepository) AddOrderItem(ctx context.Context, orderID int, item mo
 
 	_, err = r.db.Exec(ctx, updateQuery, item.Price, time.Now(), orderID)
 	if err != nil {
-		return fmt.Errorf("ошибка обновления стоимости заказа: %w", err)
+		return fmt.Errorf("error updating order total price: %w", err)
 	}
 
 	return nil
 }
 
-// GetOrderItems возвращает список товаров в заказе
+// GetOrderItems returns a list of items in the order
 func (r *OrderRepository) GetOrderItems(ctx context.Context, orderID int) ([]models.OrderItem, error) {
 	query := `
 		SELECT id, order_id, book_id, price, created_at
@@ -231,7 +231,7 @@ func (r *OrderRepository) GetOrderItems(ctx context.Context, orderID int) ([]mod
 
 	rows, err := r.db.Query(ctx, query, orderID)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка получения товаров заказа: %w", err)
+		return nil, fmt.Errorf("error getting order items: %w", err)
 	}
 	defer rows.Close()
 
@@ -246,13 +246,13 @@ func (r *OrderRepository) GetOrderItems(ctx context.Context, orderID int) ([]mod
 			&item.CreatedAt,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("ошибка сканирования данных товара: %w", err)
+			return nil, fmt.Errorf("error scanning item data: %w", err)
 		}
 		items = append(items, item)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("ошибка при итерации по результатам: %w", err)
+		return nil, fmt.Errorf("error iterating over results: %w", err)
 	}
 
 	return items, nil

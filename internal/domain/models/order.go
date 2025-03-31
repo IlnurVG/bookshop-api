@@ -2,7 +2,7 @@ package models
 
 import "time"
 
-// Order представляет модель заказа
+// Order represents an order model
 type Order struct {
 	ID         int         `json:"id" db:"id"`
 	UserID     int         `json:"user_id" db:"user_id"`
@@ -13,7 +13,7 @@ type Order struct {
 	UpdatedAt  time.Time   `json:"updated_at" db:"updated_at"`
 }
 
-// OrderItem представляет элемент заказа
+// OrderItem represents an order item
 type OrderItem struct {
 	ID        int       `json:"id" db:"id"`
 	OrderID   int       `json:"order_id" db:"order_id"`
@@ -23,7 +23,7 @@ type OrderItem struct {
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 }
 
-// OrderResponse представляет ответ с заказом
+// OrderResponse represents an order response
 type OrderResponse struct {
 	ID         int                 `json:"id"`
 	Status     string              `json:"status"`
@@ -32,7 +32,7 @@ type OrderResponse struct {
 	CreatedAt  time.Time           `json:"created_at"`
 }
 
-// OrderItemResponse представляет элемент заказа в ответе API
+// OrderItemResponse represents an order item in API response
 type OrderItemResponse struct {
 	BookID int     `json:"book_id"`
 	Title  string  `json:"title"`
@@ -40,7 +40,7 @@ type OrderItemResponse struct {
 	Price  float64 `json:"price"`
 }
 
-// ToResponse преобразует заказ в ответ API
+// ToResponse converts an order to API response
 func (o *Order) ToResponse() OrderResponse {
 	var response OrderResponse
 	response.ID = o.ID

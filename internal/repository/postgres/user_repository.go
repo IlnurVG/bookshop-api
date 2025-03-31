@@ -13,25 +13,25 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Коды ошибок PostgreSQL
+// PostgreSQL error codes
+// UniqueViolationCode - error code for uniqueness constraint violation
 const (
-	// UniqueViolationCode - код ошибки нарушения уникальности
 	UniqueViolationCode = "23505"
 )
 
-// UserRepository реализует интерфейс repositories.UserRepository
+// UserRepository implements repositories.UserRepository interface
 type UserRepository struct {
 	db *pgxpool.Pool
 }
 
-// NewUserRepository создает новый экземпляр UserRepository
+// NewUserRepository creates a new user repository instance
 func NewUserRepository(db *pgxpool.Pool) repositories.UserRepository {
 	return &UserRepository{
 		db: db,
 	}
 }
 
-// Create создает нового пользователя
+// Create creates a new user
 func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 	query := `
 		INSERT INTO users (email, password_hash, is_admin, created_at, updated_at)
@@ -52,18 +52,18 @@ func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
 	).Scan(&user.ID)
 
 	if err != nil {
-		// Проверяем, является ли ошибка нарушением уникальности
+		// Check if this is a unique constraint violation
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == UniqueViolationCode {
 			return repositories.ErrDuplicateKey
 		}
-		return fmt.Errorf("ошибка создания пользователя: %w", err)
+		return fmt.Errorf("failed to create user: %w", err)
 	}
 
 	return nil
 }
 
-// GetByID возвращает пользователя по ID
+// GetByID returns a user by ID
 func (r *UserRepository) GetByID(ctx context.Context, id int) (*models.User, error) {
 	query := `
 		SELECT id, email, password_hash, is_admin, created_at, updated_at
@@ -85,13 +85,13 @@ func (r *UserRepository) GetByID(ctx context.Context, id int) (*models.User, err
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, repositories.ErrNotFound
 		}
-		return nil, fmt.Errorf("ошибка получения пользователя: %w", err)
+		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
 
 	return user, nil
 }
 
-// GetByEmail возвращает пользователя по email
+// GetByEmail returns a user by email
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.User, error) {
 	query := `
 		SELECT id, email, password_hash, is_admin, created_at, updated_at
@@ -113,13 +113,13 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*models.
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, repositories.ErrNotFound
 		}
-		return nil, fmt.Errorf("ошибка получения пользователя: %w", err)
+		return nil, fmt.Errorf("failed to get user by email: %w", err)
 	}
 
 	return user, nil
 }
 
-// Update обновляет данные пользователя
+// Update updates user data
 func (r *UserRepository) Update(ctx context.Context, user *models.User) error {
 	query := `
 		UPDATE users
@@ -138,13 +138,13 @@ func (r *UserRepository) Update(ctx context.Context, user *models.User) error {
 	)
 
 	if err != nil {
-		return fmt.Errorf("ошибка обновления пользователя: %w", err)
+		return fmt.Errorf("failed to update user: %w", err)
 	}
 
 	return nil
 }
 
-// Delete удаляет пользователя по ID
+// Delete deletes a user by ID
 func (r *UserRepository) Delete(ctx context.Context, id int) error {
 	query := `
 		DELETE FROM users
@@ -153,7 +153,7 @@ func (r *UserRepository) Delete(ctx context.Context, id int) error {
 
 	_, err := r.db.Exec(ctx, query, id)
 	if err != nil {
-		return fmt.Errorf("ошибка удаления пользователя: %w", err)
+		return fmt.Errorf("failed to delete user: %w", err)
 	}
 
 	return nil

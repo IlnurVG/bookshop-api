@@ -13,19 +13,19 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// CategoryRepository реализует интерфейс repositories.CategoryRepository
+// CategoryRepository implements repositories.CategoryRepository interface
 type CategoryRepository struct {
 	db *pgxpool.Pool
 }
 
-// NewCategoryRepository создает новый экземпляр CategoryRepository
+// NewCategoryRepository creates a new instance of CategoryRepository
 func NewCategoryRepository(db *pgxpool.Pool) repositories.CategoryRepository {
 	return &CategoryRepository{
 		db: db,
 	}
 }
 
-// Create создает новую категорию
+// Create creates a new category
 func (r *CategoryRepository) Create(ctx context.Context, category *models.Category) error {
 	query := `
 		INSERT INTO categories (name, created_at, updated_at)
@@ -44,13 +44,13 @@ func (r *CategoryRepository) Create(ctx context.Context, category *models.Catego
 	).Scan(&category.ID)
 
 	if err != nil {
-		return fmt.Errorf("ошибка создания категории: %w", err)
+		return fmt.Errorf("error creating category: %w", err)
 	}
 
 	return nil
 }
 
-// GetByID возвращает категорию по ID
+// GetByID returns a category by ID
 func (r *CategoryRepository) GetByID(ctx context.Context, id int) (*models.Category, error) {
 	query := `
 		SELECT id, name, created_at, updated_at
@@ -68,15 +68,15 @@ func (r *CategoryRepository) GetByID(ctx context.Context, id int) (*models.Categ
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("категория не найдена")
+			return nil, fmt.Errorf("category not found")
 		}
-		return nil, fmt.Errorf("ошибка получения категории: %w", err)
+		return nil, fmt.Errorf("error getting category: %w", err)
 	}
 
 	return category, nil
 }
 
-// GetByName возвращает категорию по имени
+// GetByName returns a category by name
 func (r *CategoryRepository) GetByName(ctx context.Context, name string) (*models.Category, error) {
 	query := `
 		SELECT id, name, created_at, updated_at
@@ -94,15 +94,15 @@ func (r *CategoryRepository) GetByName(ctx context.Context, name string) (*model
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("категория не найдена")
+			return nil, fmt.Errorf("category not found")
 		}
-		return nil, fmt.Errorf("ошибка получения категории: %w", err)
+		return nil, fmt.Errorf("error getting category: %w", err)
 	}
 
 	return category, nil
 }
 
-// List возвращает список всех категорий
+// List returns a list of all categories
 func (r *CategoryRepository) List(ctx context.Context) ([]models.Category, error) {
 	query := `
 		SELECT id, name, created_at, updated_at
@@ -112,7 +112,7 @@ func (r *CategoryRepository) List(ctx context.Context) ([]models.Category, error
 
 	rows, err := r.db.Query(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка получения списка категорий: %w", err)
+		return nil, fmt.Errorf("error getting categories list: %w", err)
 	}
 	defer rows.Close()
 
@@ -126,19 +126,19 @@ func (r *CategoryRepository) List(ctx context.Context) ([]models.Category, error
 			&category.UpdatedAt,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("ошибка сканирования данных категории: %w", err)
+			return nil, fmt.Errorf("error scanning category data: %w", err)
 		}
 		categories = append(categories, category)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("ошибка при итерации по результатам: %w", err)
+		return nil, fmt.Errorf("error iterating through results: %w", err)
 	}
 
 	return categories, nil
 }
 
-// Update обновляет данные категории
+// Update updates category data
 func (r *CategoryRepository) Update(ctx context.Context, category *models.Category) error {
 	query := `
 		UPDATE categories
@@ -155,13 +155,13 @@ func (r *CategoryRepository) Update(ctx context.Context, category *models.Catego
 	)
 
 	if err != nil {
-		return fmt.Errorf("ошибка обновления категории: %w", err)
+		return fmt.Errorf("error updating category: %w", err)
 	}
 
 	return nil
 }
 
-// Delete удаляет категорию по ID
+// Delete deletes a category by ID
 func (r *CategoryRepository) Delete(ctx context.Context, id int) error {
 	query := `
 		DELETE FROM categories
@@ -170,19 +170,19 @@ func (r *CategoryRepository) Delete(ctx context.Context, id int) error {
 
 	_, err := r.db.Exec(ctx, query, id)
 	if err != nil {
-		return fmt.Errorf("ошибка удаления категории: %w", err)
+		return fmt.Errorf("error deleting category: %w", err)
 	}
 
 	return nil
 }
 
-// GetCategoriesByIDs возвращает категории по списку ID
+// GetCategoriesByIDs returns categories by a list of IDs
 func (r *CategoryRepository) GetCategoriesByIDs(ctx context.Context, ids []int) ([]models.Category, error) {
 	if len(ids) == 0 {
 		return []models.Category{}, nil
 	}
 
-	// Создаем параметры для запроса
+	// Create parameters for the query
 	args := make([]interface{}, len(ids))
 	placeholders := make([]string, len(ids))
 	for i, id := range ids {
@@ -199,7 +199,7 @@ func (r *CategoryRepository) GetCategoriesByIDs(ctx context.Context, ids []int) 
 
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка получения категорий по ID: %w", err)
+		return nil, fmt.Errorf("error getting categories by IDs: %w", err)
 	}
 	defer rows.Close()
 
@@ -213,13 +213,13 @@ func (r *CategoryRepository) GetCategoriesByIDs(ctx context.Context, ids []int) 
 			&category.UpdatedAt,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("ошибка сканирования данных категории: %w", err)
+			return nil, fmt.Errorf("error scanning category data: %w", err)
 		}
 		categories = append(categories, category)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("ошибка при итерации по результатам: %w", err)
+		return nil, fmt.Errorf("error iterating through results: %w", err)
 	}
 
 	return categories, nil

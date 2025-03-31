@@ -10,13 +10,13 @@ import (
 	"github.com/bookshop/api/internal/domain/services"
 )
 
-// Service реализует интерфейс services.BookService
+// Service implements services.BookService interface
 type Service struct {
 	bookRepo     repositories.BookRepository
 	categoryRepo repositories.CategoryRepository
 }
 
-// NewService создает новый экземпляр сервиса для работы с книгами
+// NewService creates a new instance of the book service
 func NewService(bookRepo repositories.BookRepository, categoryRepo repositories.CategoryRepository) services.BookService {
 	return &Service{
 		bookRepo:     bookRepo,
@@ -24,15 +24,15 @@ func NewService(bookRepo repositories.BookRepository, categoryRepo repositories.
 	}
 }
 
-// Create создает новую книгу
+// Create creates a new book
 func (s *Service) Create(ctx context.Context, input models.BookCreate) (*models.Book, error) {
-	// Проверяем существование категории
+	// Check if the category exists
 	_, err := s.categoryRepo.GetByID(ctx, input.CategoryID)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка проверки категории: %w", err)
+		return nil, fmt.Errorf("error checking category: %w", err)
 	}
 
-	// Создаем новую книгу
+	// Create a new book
 	now := time.Now()
 	book := &models.Book{
 		Title:         input.Title,
@@ -45,15 +45,15 @@ func (s *Service) Create(ctx context.Context, input models.BookCreate) (*models.
 		UpdatedAt:     now,
 	}
 
-	// Сохраняем книгу в базе данных
+	// Save book to database
 	if err := s.bookRepo.Create(ctx, book); err != nil {
-		return nil, fmt.Errorf("ошибка создания книги: %w", err)
+		return nil, fmt.Errorf("error creating book: %w", err)
 	}
 
-	// Загружаем информацию о категории
+	// Load category information
 	category, err := s.categoryRepo.GetByID(ctx, book.CategoryID)
 	if err != nil {
-		// Не возвращаем ошибку, так как книга уже создана
+		// Not returning an error as the book has already been created
 		return book, nil
 	}
 	book.Category = category
@@ -61,18 +61,18 @@ func (s *Service) Create(ctx context.Context, input models.BookCreate) (*models.
 	return book, nil
 }
 
-// GetByID возвращает книгу по ID
+// GetByID returns a book by its ID
 func (s *Service) GetByID(ctx context.Context, id int) (*models.Book, error) {
-	// Получаем книгу из репозитория
+	// Get book from repository
 	book, err := s.bookRepo.GetByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка получения книги: %w", err)
+		return nil, fmt.Errorf("error getting book: %w", err)
 	}
 
-	// Загружаем информацию о категории
+	// Load category information
 	category, err := s.categoryRepo.GetByID(ctx, book.CategoryID)
 	if err != nil {
-		// Не возвращаем ошибку, так как книга найдена
+		// Not returning an error as the book was found
 		return book, nil
 	}
 	book.Category = category
@@ -80,9 +80,9 @@ func (s *Service) GetByID(ctx context.Context, id int) (*models.Book, error) {
 	return book, nil
 }
 
-// List возвращает список книг с фильтрацией
+// List returns a list of books with filtering
 func (s *Service) List(ctx context.Context, filter models.BookFilter) (*models.BookListResponse, error) {
-	// Устанавливаем значения по умолчанию для пагинации
+	// Set default values for pagination
 	if filter.Page <= 0 {
 		filter.Page = 1
 	}
@@ -90,13 +90,13 @@ func (s *Service) List(ctx context.Context, filter models.BookFilter) (*models.B
 		filter.PageSize = 10
 	}
 
-	// Получаем список книг из репозитория
+	// Get book list from repository
 	books, totalCount, err := s.bookRepo.List(ctx, filter)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка получения списка книг: %w", err)
+		return nil, fmt.Errorf("error getting book list: %w", err)
 	}
 
-	// Загружаем информацию о категориях
+	// Load category information
 	if len(books) > 0 {
 		categoryIDs := make([]int, 0, len(books))
 		for _, book := range books {
@@ -105,13 +105,13 @@ func (s *Service) List(ctx context.Context, filter models.BookFilter) (*models.B
 
 		categories, err := s.categoryRepo.GetCategoriesByIDs(ctx, categoryIDs)
 		if err == nil {
-			// Создаем карту категорий для быстрого доступа
+			// Create a map of categories for quick access
 			categoryMap := make(map[int]*models.Category, len(categories))
 			for i := range categories {
 				categoryMap[categories[i].ID] = &categories[i]
 			}
 
-			// Устанавливаем категории для книг
+			// Set categories for books
 			for i := range books {
 				if category, ok := categoryMap[books[i].CategoryID]; ok {
 					books[i].Category = category
@@ -120,13 +120,13 @@ func (s *Service) List(ctx context.Context, filter models.BookFilter) (*models.B
 		}
 	}
 
-	// Вычисляем общее количество страниц
+	// Calculate total number of pages
 	totalPages := totalCount / filter.PageSize
 	if totalCount%filter.PageSize > 0 {
 		totalPages++
 	}
 
-	// Формируем ответ
+	// Form the response
 	response := &models.BookListResponse{
 		Books:      books,
 		TotalCount: totalCount,
@@ -138,15 +138,15 @@ func (s *Service) List(ctx context.Context, filter models.BookFilter) (*models.B
 	return response, nil
 }
 
-// Update обновляет данные книги
+// Update updates book data
 func (s *Service) Update(ctx context.Context, id int, input models.BookUpdate) (*models.Book, error) {
-	// Получаем текущую книгу
+	// Get current book
 	book, err := s.bookRepo.GetByID(ctx, id)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка получения книги: %w", err)
+		return nil, fmt.Errorf("error getting book: %w", err)
 	}
 
-	// Обновляем поля книги
+	// Update book fields
 	if input.Title != nil {
 		book.Title = *input.Title
 	}
@@ -160,26 +160,26 @@ func (s *Service) Update(ctx context.Context, id int, input models.BookUpdate) (
 		book.Price = *input.Price
 	}
 	if input.CategoryID != nil {
-		// Проверяем существование категории
+		// Check if the category exists
 		_, err := s.categoryRepo.GetByID(ctx, *input.CategoryID)
 		if err != nil {
-			return nil, fmt.Errorf("ошибка проверки категории: %w", err)
+			return nil, fmt.Errorf("error checking category: %w", err)
 		}
 		book.CategoryID = *input.CategoryID
 	}
 
-	// Обновляем время изменения
+	// Update modification time
 	book.UpdatedAt = time.Now()
 
-	// Сохраняем изменения в базе данных
+	// Save changes to database
 	if err := s.bookRepo.Update(ctx, book); err != nil {
-		return nil, fmt.Errorf("ошибка обновления книги: %w", err)
+		return nil, fmt.Errorf("error updating book: %w", err)
 	}
 
-	// Загружаем информацию о категории
+	// Load category information
 	category, err := s.categoryRepo.GetByID(ctx, book.CategoryID)
 	if err != nil {
-		// Не возвращаем ошибку, так как книга уже обновлена
+		// Not returning an error as the book has already been updated
 		return book, nil
 	}
 	book.Category = category
@@ -187,35 +187,35 @@ func (s *Service) Update(ctx context.Context, id int, input models.BookUpdate) (
 	return book, nil
 }
 
-// Delete удаляет книгу по ID
+// Delete deletes a book by ID
 func (s *Service) Delete(ctx context.Context, id int) error {
-	// Проверяем существование книги
+	// Check if the book exists
 	_, err := s.bookRepo.GetByID(ctx, id)
 	if err != nil {
-		return fmt.Errorf("ошибка получения книги: %w", err)
+		return fmt.Errorf("error getting book: %w", err)
 	}
 
-	// Удаляем книгу
+	// Delete the book
 	if err := s.bookRepo.Delete(ctx, id); err != nil {
-		return fmt.Errorf("ошибка удаления книги: %w", err)
+		return fmt.Errorf("error deleting book: %w", err)
 	}
 
 	return nil
 }
 
-// GetBooksByIDs возвращает книги по списку ID
+// GetBooksByIDs returns books by a list of IDs
 func (s *Service) GetBooksByIDs(ctx context.Context, ids []int) ([]models.Book, error) {
 	if len(ids) == 0 {
 		return []models.Book{}, nil
 	}
 
-	// Получаем книги из репозитория
+	// Get books from repository
 	books, err := s.bookRepo.GetBooksByIDs(ctx, ids)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка получения книг: %w", err)
+		return nil, fmt.Errorf("error getting books: %w", err)
 	}
 
-	// Загружаем информацию о категориях
+	// Load category information
 	if len(books) > 0 {
 		categoryIDs := make([]int, 0, len(books))
 		for _, book := range books {
@@ -224,13 +224,13 @@ func (s *Service) GetBooksByIDs(ctx context.Context, ids []int) ([]models.Book, 
 
 		categories, err := s.categoryRepo.GetCategoriesByIDs(ctx, categoryIDs)
 		if err == nil {
-			// Создаем карту категорий для быстрого доступа
+			// Create a map of categories for quick access
 			categoryMap := make(map[int]*models.Category, len(categories))
 			for i := range categories {
 				categoryMap[categories[i].ID] = &categories[i]
 			}
 
-			// Устанавливаем категории для книг
+			// Set categories for books
 			for i := range books {
 				if category, ok := categoryMap[books[i].CategoryID]; ok {
 					books[i].Category = category

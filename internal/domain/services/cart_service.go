@@ -6,21 +6,20 @@ import (
 	"github.com/bookshop/api/internal/domain/models"
 )
 
-// CartService определяет методы для работы с корзиной
+// CartService defines methods for working with shopping cart
 type CartService interface {
-	// AddItem добавляет товар в корзину пользователя
+	// AddItem adds an item to the user's cart
 	AddItem(ctx context.Context, userID int, input models.CartItemRequest) error
 
-	// GetCart возвращает корзину пользователя
+	// GetCart returns the user's cart
 	GetCart(ctx context.Context, userID int) (*models.CartResponse, error)
 
-	// RemoveItem удаляет товар из корзины пользователя
+	// RemoveItem removes an item from the user's cart
 	RemoveItem(ctx context.Context, userID int, bookID int) error
 
-	// ClearCart очищает корзину пользователя
+	// ClearCart clears the user's cart
 	ClearCart(ctx context.Context, userID int) error
 
-	// CleanupExpiredItems удаляет истекшие товары из корзин
+	// CleanupExpiredItems removes expired items from carts
 	CleanupExpiredItems(ctx context.Context) error
 }
-

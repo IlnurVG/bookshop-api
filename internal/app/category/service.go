@@ -12,19 +12,19 @@ import (
 	"github.com/bookshop/api/pkg/logger"
 )
 
-// Определение ошибок
+// Error definitions
 var (
-	ErrCategoryNotFound = errors.New("категория не найдена")
-	ErrCategoryExists   = errors.New("категория с таким именем уже существует")
+	ErrCategoryNotFound = errors.New("category not found")
+	ErrCategoryExists   = errors.New("category with this name already exists")
 )
 
-// Service реализует интерфейс services.CategoryService
+// Service implements services.CategoryService interface
 type Service struct {
 	categoryRepo repositories.CategoryRepository
 	logger       logger.Logger
 }
 
-// NewService создает новый экземпляр сервиса категорий
+// NewService creates a new instance of the category service
 func NewService(
 	categoryRepo repositories.CategoryRepository,
 	logger logger.Logger,
@@ -35,98 +35,98 @@ func NewService(
 	}
 }
 
-// Create создает новую категорию
+// Create creates a new category
 func (s *Service) Create(ctx context.Context, input models.CategoryCreate) (*models.Category, error) {
-	// Проверяем существование категории с таким именем
+	// Check if a category with this name already exists
 	if _, err := s.categoryRepo.GetByName(ctx, input.Name); err == nil {
 		return nil, ErrCategoryExists
 	} else if !errors.Is(err, repositories.ErrNotFound) {
-		return nil, fmt.Errorf("ошибка проверки существования категории: %w", err)
+		return nil, fmt.Errorf("error checking if category exists: %w", err)
 	}
 
-	// Создаем категорию
+	// Create category
 	category := &models.Category{
 		Name:      input.Name,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
 
-	// Сохраняем категорию
+	// Save category
 	if err := s.categoryRepo.Create(ctx, category); err != nil {
-		return nil, fmt.Errorf("ошибка создания категории: %w", err)
+		return nil, fmt.Errorf("error creating category: %w", err)
 	}
 
 	return category, nil
 }
 
-// GetByID возвращает категорию по ID
+// GetByID returns a category by ID
 func (s *Service) GetByID(ctx context.Context, id int) (*models.Category, error) {
-	// Получаем категорию
+	// Get category
 	category, err := s.categoryRepo.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, repositories.ErrNotFound) {
 			return nil, ErrCategoryNotFound
 		}
-		return nil, fmt.Errorf("ошибка получения категории: %w", err)
+		return nil, fmt.Errorf("error getting category: %w", err)
 	}
 
 	return category, nil
 }
 
-// List возвращает список всех категорий
+// List returns a list of all categories
 func (s *Service) List(ctx context.Context) ([]models.Category, error) {
-	// Получаем список категорий
+	// Get list of categories
 	categories, err := s.categoryRepo.List(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка получения списка категорий: %w", err)
+		return nil, fmt.Errorf("error getting category list: %w", err)
 	}
 
 	return categories, nil
 }
 
-// Update обновляет категорию
+// Update updates a category
 func (s *Service) Update(ctx context.Context, id int, input models.CategoryUpdate) (*models.Category, error) {
-	// Получаем категорию
+	// Get category
 	category, err := s.categoryRepo.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, repositories.ErrNotFound) {
 			return nil, ErrCategoryNotFound
 		}
-		return nil, fmt.Errorf("ошибка получения категории: %w", err)
+		return nil, fmt.Errorf("error getting category: %w", err)
 	}
 
-	// Проверяем, не существует ли другая категория с таким именем
+	// Check if another category with this name exists
 	if existing, err := s.categoryRepo.GetByName(ctx, input.Name); err == nil && existing.ID != id {
 		return nil, ErrCategoryExists
 	} else if err != nil && !errors.Is(err, repositories.ErrNotFound) {
-		return nil, fmt.Errorf("ошибка проверки существования категории: %w", err)
+		return nil, fmt.Errorf("error checking if category exists: %w", err)
 	}
 
-	// Обновляем данные
+	// Update data
 	category.Name = input.Name
 	category.UpdatedAt = time.Now()
 
-	// Сохраняем изменения
+	// Save changes
 	if err := s.categoryRepo.Update(ctx, category); err != nil {
-		return nil, fmt.Errorf("ошибка обновления категории: %w", err)
+		return nil, fmt.Errorf("error updating category: %w", err)
 	}
 
 	return category, nil
 }
 
-// Delete удаляет категорию
+// Delete deletes a category
 func (s *Service) Delete(ctx context.Context, id int) error {
-	// Проверяем существование категории
+	// Check if the category exists
 	if _, err := s.categoryRepo.GetByID(ctx, id); err != nil {
 		if errors.Is(err, repositories.ErrNotFound) {
 			return ErrCategoryNotFound
 		}
-		return fmt.Errorf("ошибка получения категории: %w", err)
+		return fmt.Errorf("error getting category: %w", err)
 	}
 
-	// Удаляем категорию
+	// Delete category
 	if err := s.categoryRepo.Delete(ctx, id); err != nil {
-		return fmt.Errorf("ошибка удаления категории: %w", err)
+		return fmt.Errorf("error deleting category: %w", err)
 	}
 
 	return nil

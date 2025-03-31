@@ -1,88 +1,95 @@
 # Bookshop API
 
-RESTful API сервис для книжного магазина, реализованный на Go 1.24.
+RESTful API service for a bookstore, implemented in Go 1.24.
 
-## Описание проекта
+## Project Description
 
-Bookshop API предоставляет бэкенд для книжного магазина со следующим функционалом:
-- Просмотр и фильтрация книг по категориям
-- Регистрация и аутентификация пользователей
-- Управление корзиной покупок
-- Оформление заказов
-- Административные функции (CRUD для книг и категорий)
+Bookshop API provides a backend for a bookstore with the following functionality:
 
-## Уровни доступа
+- User management (registration, authentication, profile management)
+- Book catalog with categories and search
+- Shopping cart system with item reservations
+- Order processing and management
+- Payment integration
+- Admin panel for content management
 
-1. **Анонимные пользователи**: просмотр и фильтрация книг
-2. **Авторизованные пользователи**: добавление книг в корзину, оформление заказа
-3. **Администраторы**: управление каталогом (CRUD для книг и категорий)
-
-## Технологический стек
+## Technologies
 
 - Go 1.24
-- Echo Framework
-- PostgreSQL (доступ через PGX)
-- Redis (для управления корзиной и блокировками)
-- JWT аутентификация
-- Zap для логирования
-- Viper для конфигурации
+- Echo framework
+- PostgreSQL
+- Redis
+- Docker & Docker Compose
+- JWT authentication
+- OpenAPI/Swagger documentation
 
-## Установка и запуск
-
-### Требования
-- Go 1.24+
-- Docker и Docker Compose
-- PostgreSQL 15+
-- Redis 7+
-
-### Локальный запуск
-
-1. Клонировать репозиторий:
-```
-git clone https://github.com/bookshop/api.git
-cd api
-```
-
-2. Запустить зависимости через Docker Compose:
-```
-docker-compose up -d postgres redis
-```
-
-3. Запустить миграции:
-```
-go run cmd/migration/main.go
-```
-
-4. Запустить сервер:
-```
-go run cmd/api/main.go
-```
-
-API будет доступен по адресу `http://localhost:8080`.
-
-## Структура проекта
+## Project Structure
 
 ```
-bookshop/
+bookshop-api/
 ├── cmd/
-│   └── api/               # Точка входа приложения
-├── config/                # Конфигурация
+│   └── api/                - Application entry point
+├── config/                 - Configuration files
 ├── internal/
-│   ├── app/               # Сервисы приложения
-│   ├── domain/            # Доменная модель
-│   ├── handlers/          # API обработчики
-│   ├── middleware/        # Промежуточные обработчики
-│   ├── repository/        # Слой доступа к данным
-│   └── server/            # Настройка HTTP сервера
-├── migrations/            # Миграции БД
-├── pkg/                   # Общие пакеты
-└── scripts/               # Вспомогательные скрипты
+│   ├── domain/             - Domain models and repository interfaces
+│   ├── handlers/           - HTTP handlers for API endpoints
+│   ├── middleware/         - HTTP middleware components
+│   ├── repository/         - Repository implementations
+│   ├── server/             - Server configuration and setup
+│   └── service/            - Service layer (business logic)
+├── migrations/             - Database migrations
+├── pkg/                    - Reusable packages
+│   ├── errors/             - Error handling utilities
+│   ├── logger/             - Logging package
+│   └── validator/          - Request validation
+└── docs/                   - Documentation
 ```
 
-## API Документация
+## Getting Started
 
-REST API документировано с использованием Swagger и доступно по адресу `/swagger/index.html`.
+### Prerequisites
 
-## Лицензия
+- Go 1.24 or later
+- Docker and Docker Compose
+- Make
 
-MIT
+### Running Locally
+
+1. Clone the repository:
+   ```
+   git clone https://github.com/username/bookshop-api.git
+   cd bookshop-api
+   ```
+
+2. Start dependencies (PostgreSQL and Redis):
+   ```
+   make docker-up
+   ```
+
+3. Run migrations:
+   ```
+   make migrate-up
+   ```
+
+4. Start the server:
+   ```
+   make run
+   ```
+
+The API will be available at `http://localhost:8080`.
+
+## API Documentation
+
+When the server is running, Swagger documentation is available at:
+`http://localhost:8080/swagger`
+
+## Testing
+
+Run tests:
+```
+make test
+```
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

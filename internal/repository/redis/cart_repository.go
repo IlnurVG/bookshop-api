@@ -11,76 +11,76 @@ import (
 )
 
 const (
-	// cartKeyPrefix префикс для ключей корзины
+	// cartKeyPrefix prefix for cart keys
 	cartKeyPrefix = "cart:"
-	// cartLockKeyPrefix префикс для ключей блокировки корзины
+	// cartLockKeyPrefix prefix for cart lock keys
 	cartLockKeyPrefix = "cart_lock:"
 )
 
-// CartRepository реализует интерфейс repositories.CartRepository
+// CartRepository implements repositories.CartRepository interface
 type CartRepository struct {
 	client *redis.Client
 }
 
-// NewCartRepository создает новый экземпляр репозитория корзины
+// NewCartRepository creates a new instance of cart repository
 func NewCartRepository(client *redis.Client) *CartRepository {
 	return &CartRepository{
 		client: client,
 	}
 }
 
-// AddItem добавляет товар в корзину пользователя
+// AddItem adds an item to the user's cart
 func (r *CartRepository) AddItem(ctx context.Context, userID int, bookID int, expiresAt time.Time) error {
-	// Проверяем блокировку корзины
+	// Check if cart is locked
 	if r.isCartLocked(ctx, userID) {
-		return fmt.Errorf("корзина заблокирована")
+		return fmt.Errorf("cart is locked")
 	}
 
-	// Создаем элемент корзины
+	// Create cart item
 	item := models.CartItem{
 		BookID:    bookID,
 		AddedAt:   time.Now(),
 		ExpiresAt: expiresAt,
 	}
 
-	// Сериализуем элемент
+	// Serialize item
 	itemJSON, err := json.Marshal(item)
 	if err != nil {
-		return fmt.Errorf("ошибка сериализации элемента корзины: %w", err)
+		return fmt.Errorf("error serializing cart item: %w", err)
 	}
 
-	// Добавляем элемент в корзину
+	// Add item to cart
 	key := fmt.Sprintf("%s%d", cartKeyPrefix, userID)
 	if err := r.client.HSet(ctx, key, fmt.Sprint(bookID), itemJSON).Err(); err != nil {
-		return fmt.Errorf("ошибка добавления элемента в корзину: %w", err)
+		return fmt.Errorf("error adding item to cart: %w", err)
 	}
 
 	return nil
 }
 
-// GetCart возвращает корзину пользователя
+// GetCart returns the user's cart
 func (r *CartRepository) GetCart(ctx context.Context, userID int) (*models.Cart, error) {
-	// Получаем все элементы корзины
+	// Get all cart items
 	key := fmt.Sprintf("%s%d", cartKeyPrefix, userID)
 	items, err := r.client.HGetAll(ctx, key).Result()
 	if err != nil {
-		return nil, fmt.Errorf("ошибка получения корзины: %w", err)
+		return nil, fmt.Errorf("error getting cart: %w", err)
 	}
 
-	// Создаем корзину
+	// Create cart
 	cart := &models.Cart{
 		UserID: userID,
 		Items:  make([]models.CartItem, 0, len(items)),
 	}
 
-	// Десериализуем элементы
+	// Deserialize items
 	for _, itemJSON := range items {
 		var item models.CartItem
 		if err := json.Unmarshal([]byte(itemJSON), &item); err != nil {
-			return nil, fmt.Errorf("ошибка десериализации элемента корзины: %w", err)
+			return nil, fmt.Errorf("error deserializing cart item: %w", err)
 		}
 
-		// Проверяем срок действия элемента
+		// Check item expiration
 		if time.Now().After(item.ExpiresAt) {
 			continue
 		}
@@ -91,61 +91,61 @@ func (r *CartRepository) GetCart(ctx context.Context, userID int) (*models.Cart,
 	return cart, nil
 }
 
-// RemoveItem удаляет товар из корзины пользователя
+// RemoveItem removes an item from the user's cart
 func (r *CartRepository) RemoveItem(ctx context.Context, userID int, bookID int) error {
-	// Проверяем блокировку корзины
+	// Check if cart is locked
 	if r.isCartLocked(ctx, userID) {
-		return fmt.Errorf("корзина заблокирована")
+		return fmt.Errorf("cart is locked")
 	}
 
-	// Удаляем элемент из корзины
+	// Remove item from cart
 	key := fmt.Sprintf("%s%d", cartKeyPrefix, userID)
 	if err := r.client.HDel(ctx, key, fmt.Sprint(bookID)).Err(); err != nil {
-		return fmt.Errorf("ошибка удаления элемента из корзины: %w", err)
+		return fmt.Errorf("error removing item from cart: %w", err)
 	}
 
 	return nil
 }
 
-// ClearCart очищает корзину пользователя
+// ClearCart clears the user's cart
 func (r *CartRepository) ClearCart(ctx context.Context, userID int) error {
-	// Проверяем блокировку корзины
+	// Check if cart is locked
 	if r.isCartLocked(ctx, userID) {
-		return fmt.Errorf("корзина заблокирована")
+		return fmt.Errorf("cart is locked")
 	}
 
-	// Удаляем корзину
+	// Delete cart
 	key := fmt.Sprintf("%s%d", cartKeyPrefix, userID)
 	if err := r.client.Del(ctx, key).Err(); err != nil {
-		return fmt.Errorf("ошибка очистки корзины: %w", err)
+		return fmt.Errorf("error clearing cart: %w", err)
 	}
 
 	return nil
 }
 
-// RemoveExpiredItems удаляет истекшие товары из корзин
+// RemoveExpiredItems removes expired items from carts
 func (r *CartRepository) RemoveExpiredItems(ctx context.Context) error {
-	// Получаем все корзины
+	// Get all carts
 	pattern := fmt.Sprintf("%s*", cartKeyPrefix)
 	iter := r.client.Scan(ctx, 0, pattern, 0).Iterator()
 
 	for iter.Next(ctx) {
 		key := iter.Val()
 
-		// Получаем все элементы корзины
+		// Get all cart items
 		items, err := r.client.HGetAll(ctx, key).Result()
 		if err != nil {
 			continue
 		}
 
-		// Проверяем каждый элемент
+		// Check each item
 		for bookID, itemJSON := range items {
 			var item models.CartItem
 			if err := json.Unmarshal([]byte(itemJSON), &item); err != nil {
 				continue
 			}
 
-			// Удаляем истекшие элементы
+			// Remove expired items
 			if time.Now().After(item.ExpiresAt) {
 				r.client.HDel(ctx, key, bookID)
 			}
@@ -155,34 +155,34 @@ func (r *CartRepository) RemoveExpiredItems(ctx context.Context) error {
 	return iter.Err()
 }
 
-// LockCart блокирует корзину на время оформления заказа
+// LockCart locks the cart during checkout
 func (r *CartRepository) LockCart(ctx context.Context, userID int, duration time.Duration) error {
-	// Проверяем, не заблокирована ли уже корзина
+	// Check if cart is already locked
 	if r.isCartLocked(ctx, userID) {
-		return fmt.Errorf("корзина уже заблокирована")
+		return fmt.Errorf("cart is already locked")
 	}
 
-	// Блокируем корзину
+	// Lock cart
 	key := fmt.Sprintf("%s%d", cartLockKeyPrefix, userID)
 	if err := r.client.Set(ctx, key, "locked", duration).Err(); err != nil {
-		return fmt.Errorf("ошибка блокировки корзины: %w", err)
+		return fmt.Errorf("error locking cart: %w", err)
 	}
 
 	return nil
 }
 
-// UnlockCart разблокирует корзину
+// UnlockCart unlocks the cart
 func (r *CartRepository) UnlockCart(ctx context.Context, userID int) error {
-	// Удаляем блокировку
+	// Remove lock
 	key := fmt.Sprintf("%s%d", cartLockKeyPrefix, userID)
 	if err := r.client.Del(ctx, key).Err(); err != nil {
-		return fmt.Errorf("ошибка разблокировки корзины: %w", err)
+		return fmt.Errorf("error unlocking cart: %w", err)
 	}
 
 	return nil
 }
 
-// isCartLocked проверяет, заблокирована ли корзина
+// isCartLocked checks if the cart is locked
 func (r *CartRepository) isCartLocked(ctx context.Context, userID int) bool {
 	key := fmt.Sprintf("%s%d", cartLockKeyPrefix, userID)
 	exists, _ := r.client.Exists(ctx, key).Result()

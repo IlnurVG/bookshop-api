@@ -1,50 +1,50 @@
 #!/bin/bash
 
-# Установка разрешений на выполнение
+# Set execution permissions
 chmod +x scripts/setup.sh
 chmod +x scripts/build.sh
 
-# Проверка наличия Docker
+# Check if Docker is installed
 if ! command -v docker &> /dev/null; then
-    echo "Docker не установлен. Установите Docker для запуска зависимостей."
+    echo "Docker is not installed. Please install Docker to run dependencies."
     exit 1
 fi
 
-# Проверка наличия Docker Compose
+# Check if Docker Compose is installed
 if ! command -v docker-compose &> /dev/null; then
-    echo "Docker Compose не установлен. Установите Docker Compose для запуска зависимостей."
+    echo "Docker Compose is not installed. Please install Docker Compose to run dependencies."
     exit 1
 fi
 
-# Проверка и установка зависимостей Go
+# Check and install Go dependencies
 if ! command -v golangci-lint &> /dev/null; then
-    echo "Установка golangci-lint..."
+    echo "Installing golangci-lint..."
     go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 fi
 
 if ! command -v swag &> /dev/null; then
-    echo "Установка swag..."
+    echo "Installing swag..."
     go install github.com/swaggo/swag/cmd/swag@latest
 fi
 
 if ! command -v mockgen &> /dev/null; then
-    echo "Установка mockgen..."
+    echo "Installing mockgen..."
     go install github.com/golang/mock/mockgen@latest
 fi
 
 if ! command -v migrate &> /dev/null; then
-    echo "Установка migrate..."
+    echo "Installing migrate..."
     go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 fi
 
-# Создание директории для сборки
+# Create build directory
 mkdir -p bin
 
-echo "==> Создание go.sum..."
+echo "==> Creating go.sum..."
 go mod tidy
 
-echo "==> Настройка окружения завершена."
-echo "Для инициализации проекта выполните: make init"
-echo "Для запуска приложения выполните: make run"
+echo "==> Environment setup completed."
+echo "To initialize the project, run: make init"
+echo "To start the application, run: make run"
 
 

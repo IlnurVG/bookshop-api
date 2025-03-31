@@ -6,15 +6,14 @@ import (
 	"github.com/bookshop/api/internal/domain/models"
 )
 
-// CheckoutService определяет методы для оформления заказа
+// CheckoutService defines methods for order processing
 type CheckoutService interface {
-	// Checkout оформляет заказ из корзины пользователя
+	// Checkout creates an order from the user's cart
 	Checkout(ctx context.Context, userID int) (*models.Order, error)
 
-	// GetOrdersByUserID возвращает список заказов пользователя
+	// GetOrdersByUserID returns a list of user's orders
 	GetOrdersByUserID(ctx context.Context, userID int) ([]models.Order, error)
 
-	// GetOrderByID возвращает заказ по ID
+	// GetOrderByID returns an order by ID
 	GetOrderByID(ctx context.Context, orderID int, userID int) (*models.Order, error)
 }
-

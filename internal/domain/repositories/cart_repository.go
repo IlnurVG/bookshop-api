@@ -7,30 +7,30 @@ import (
 	"github.com/bookshop/api/internal/domain/models"
 )
 
-// CartRepository определяет методы для работы с корзиной в хранилище
+// CartRepository defines methods for working with shopping cart in storage
 type CartRepository interface {
-	// AddItem добавляет товар в корзину пользователя
+	// AddItem adds an item to the user's cart
 	AddItem(ctx context.Context, userID int, bookID int, expiresAt time.Time) error
 
-	// GetCart возвращает корзину пользователя
+	// GetCart returns the user's cart
 	GetCart(ctx context.Context, userID int) (*models.Cart, error)
 
-	// RemoveItem удаляет товар из корзины пользователя
+	// RemoveItem removes an item from the user's cart
 	RemoveItem(ctx context.Context, userID int, bookID int) error
 
-	// ClearCart очищает корзину пользователя
+	// ClearCart clears the user's cart
 	ClearCart(ctx context.Context, userID int) error
 
-	// GetExpiredCarts возвращает список истекших корзин
+	// GetExpiredCarts returns a list of expired carts
 	GetExpiredCarts(ctx context.Context) ([]models.Cart, error)
 
-	// RemoveExpiredItems удаляет истекшие товары из корзин
+	// RemoveExpiredItems removes expired items from carts
 	RemoveExpiredItems(ctx context.Context) error
 
-	// LockCart блокирует корзину на время оформления заказа
-	// Возвращает ошибку, если корзина уже заблокирована
+	// LockCart locks the cart during checkout
+	// Returns an error if the cart is already locked
 	LockCart(ctx context.Context, userID int, duration time.Duration) error
 
-	// UnlockCart разблокирует корзину
+	// UnlockCart unlocks the cart
 	UnlockCart(ctx context.Context, userID int) error
 }

@@ -6,86 +6,92 @@ import (
 	"net/http"
 )
 
-// Стандартные ошибки приложения
+// Standard application errors
 var (
-	ErrNotFound           = errors.New("ресурс не найден")
-	ErrBadRequest         = errors.New("некорректный запрос")
-	ErrUnauthorized       = errors.New("не авторизован")
-	ErrForbidden          = errors.New("доступ запрещен")
-	ErrInternalServer     = errors.New("внутренняя ошибка сервера")
-	ErrConflict           = errors.New("конфликт данных")
-	ErrInvalidCredentials = errors.New("неверные учетные данные")
-	ErrOutOfStock         = errors.New("товар отсутствует на складе")
-	ErrCartExpired        = errors.New("корзина истекла")
+	ErrNotFound           = errors.New("not found")
+	ErrBadRequest         = errors.New("bad request")
+	ErrUnauthorized       = errors.New("unauthorized")
+	ErrForbidden          = errors.New("forbidden")
+	ErrInternalServer     = errors.New("internal server error")
+	ErrConflict           = errors.New("conflict")
+	ErrInvalidCredentials = errors.New("invalid credentials")
+	ErrOutOfStock         = errors.New("out of stock")
+	ErrCartExpired        = errors.New("cart expired")
 )
 
-// AppError представляет ошибку приложения
+// AppError represents an application error
 type AppError struct {
-	Err     error
-	Message string
 	Code    int
+	Message string
+	Err     error
 }
 
-// Error возвращает сообщение об ошибке
+// Error returns the error message
 func (e *AppError) Error() string {
+	if e.Err != nil {
+		return fmt.Sprintf("%s: %v", e.Message, e.Err)
+	}
 	return e.Message
 }
 
-// Unwrap возвращает оригинальную ошибку
+// Unwrap returns the original error
 func (e *AppError) Unwrap() error {
 	return e.Err
 }
 
-// NewAppError создает новую ошибку приложения
-func NewAppError(err error, message string, code int) *AppError {
+// NewAppError creates a new application error
+func NewAppError(code int, message string, err error) *AppError {
 	return &AppError{
-		Err:     err,
-		Message: message,
 		Code:    code,
+		Message: message,
+		Err:     err,
 	}
 }
 
-// NewNotFoundError создает ошибку "не найдено"
-func NewNotFoundError(message string) *AppError {
-	return NewAppError(ErrNotFound, message, http.StatusNotFound)
+// NewNotFoundError creates a "not found" error
+func NewNotFoundError(err error) *AppError {
+	return NewAppError(http.StatusNotFound, "not found", err)
 }
 
-// NewBadRequestError создает ошибку "некорректный запрос"
-func NewBadRequestError(message string) *AppError {
-	return NewAppError(ErrBadRequest, message, http.StatusBadRequest)
+// NewBadRequestError creates a "bad request" error
+func NewBadRequestError(err error) *AppError {
+	return NewAppError(http.StatusBadRequest, "bad request", err)
 }
 
-// NewUnauthorizedError создает ошибку "не авторизован"
-func NewUnauthorizedError(message string) *AppError {
-	return NewAppError(ErrUnauthorized, message, http.StatusUnauthorized)
+// NewUnauthorizedError creates an "unauthorized" error
+func NewUnauthorizedError(err error) *AppError {
+	return NewAppError(http.StatusUnauthorized, "unauthorized", err)
 }
 
-// NewForbiddenError создает ошибку "доступ запрещен"
-func NewForbiddenError(message string) *AppError {
-	return NewAppError(ErrForbidden, message, http.StatusForbidden)
+// NewForbiddenError creates a "forbidden" error
+func NewForbiddenError(err error) *AppError {
+	return NewAppError(http.StatusForbidden, "forbidden", err)
 }
 
-// NewInternalServerError создает ошибку "внутренняя ошибка сервера"
+// NewInternalServerError creates an "internal server error"
 func NewInternalServerError(err error) *AppError {
-	return NewAppError(err, "внутренняя ошибка сервера", http.StatusInternalServerError)
+	return NewAppError(http.StatusInternalServerError, "internal server error", err)
 }
 
-// NewConflictError создает ошибку "конфликт данных"
-func NewConflictError(message string) *AppError {
-	return NewAppError(ErrConflict, message, http.StatusConflict)
+// NewConflictError creates a "conflict" error
+func NewConflictError(err error) *AppError {
+	return NewAppError(http.StatusConflict, "conflict", err)
 }
 
-// Is проверяет, является ли ошибка определенного типа
+// Is checks if the error is of a specific type
 func Is(err, target error) bool {
 	return errors.Is(err, target)
 }
 
-// As устанавливает target в первую ошибку в цепочке err, которая соответствует типу target
+// As sets target to the first error in err's chain that matches target's type
 func As(err error, target interface{}) bool {
 	return errors.As(err, target)
 }
 
-// Wrap оборачивает ошибку с дополнительным сообщением
+// Wrap wraps an error with an additional message
 func Wrap(err error, message string) error {
+	if err == nil {
+		return nil
+	}
 	return fmt.Errorf("%s: %w", message, err)
 }

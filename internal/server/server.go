@@ -16,7 +16,7 @@ import (
 	"github.com/labstack/echo/v4/middleware"
 )
 
-// Server представляет HTTP сервер
+// Server represents an HTTP server
 type Server struct {
 	echo            *echo.Echo
 	config          *config.Config
@@ -27,7 +27,7 @@ type Server struct {
 	bookModule      *book.Module
 }
 
-// NewServer создает новый экземпляр HTTP сервера
+// NewServer creates a new instance of HTTP server
 func NewServer(
 	cfg *config.Config,
 	logger *logger.Logger,
@@ -38,24 +38,24 @@ func NewServer(
 	e := echo.New()
 	e.HideBanner = true
 
-	// Настройка middleware
+	// Middleware setup
 	e.Use(middleware.Recover())
 	e.Use(middleware.RequestID())
 	e.Use(middleware.CORS())
 	e.Use(middleware.Logger())
 
-	// Настройка адреса сервера
+	// Server address configuration
 	addr := fmt.Sprintf("%s:%d", cfg.HTTP.Host, cfg.HTTP.Port)
 
-	// Настройка таймаутов
+	// Timeout configuration
 	e.Server.ReadTimeout = cfg.HTTP.ReadTimeout
 	e.Server.WriteTimeout = cfg.HTTP.WriteTimeout
 	e.Server.IdleTimeout = cfg.HTTP.IdleTimeout
 
-	// Инициализация обработчиков
+	// Handlers initialization
 	checkoutHandler := handlers.NewCheckoutHandler(checkoutService)
 
-	// Инициализация модуля книг
+	// Book module initialization
 	bookModule := book.NewModule(bookRepo, categoryRepo)
 
 	server := &Server{
@@ -68,28 +68,28 @@ func NewServer(
 		bookModule:      bookModule,
 	}
 
-	// Регистрация маршрутов
+	// Route registration
 	server.registerRoutes()
 
 	return server, nil
 }
 
-// Start запускает HTTP сервер
+// Start launches the HTTP server
 func (s *Server) Start() error {
 	return s.echo.Start(s.Addr)
 }
 
-// Shutdown останавливает HTTP сервер
+// Shutdown stops the HTTP server
 func (s *Server) Shutdown(ctx context.Context) error {
 	return s.echo.Shutdown(ctx)
 }
 
-// GetEcho возвращает экземпляр Echo
+// GetEcho returns the Echo instance
 func (s *Server) GetEcho() *echo.Echo {
 	return s.echo
 }
 
-// HealthCheck обработчик для проверки работоспособности сервера
+// HealthCheck handler for server health checking
 func (s *Server) HealthCheck(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]string{
 		"status": "ok",

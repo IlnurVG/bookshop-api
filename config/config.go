@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// Config содержит все настройки приложения
+// Config contains all application settings
 type Config struct {
 	App      AppConfig
 	HTTP     HTTPConfig
@@ -16,14 +16,14 @@ type Config struct {
 	JWT      JWTConfig
 }
 
-// AppConfig содержит общие настройки приложения
+// AppConfig contains general application settings
 type AppConfig struct {
 	Name        string
 	Environment string
 	LogLevel    string
 }
 
-// HTTPConfig содержит настройки HTTP сервера
+// HTTPConfig contains HTTP server settings
 type HTTPConfig struct {
 	Host         string
 	Port         int
@@ -32,7 +32,7 @@ type HTTPConfig struct {
 	IdleTimeout  time.Duration
 }
 
-// DatabaseConfig содержит настройки подключения к базе данных
+// DatabaseConfig contains database connection settings
 type DatabaseConfig struct {
 	Host     string
 	Port     int
@@ -44,7 +44,7 @@ type DatabaseConfig struct {
 	Timeout  time.Duration
 }
 
-// RedisConfig содержит настройки подключения к Redis
+// RedisConfig contains Redis connection settings
 type RedisConfig struct {
 	Host     string
 	Port     int
@@ -53,7 +53,7 @@ type RedisConfig struct {
 	Timeout  time.Duration
 }
 
-// JWTConfig содержит настройки для JWT токенов
+// JWTConfig contains JWT token settings
 type JWTConfig struct {
 	Secret            string
 	AccessTokenTTL    time.Duration
@@ -61,30 +61,30 @@ type JWTConfig struct {
 	CartExpirationTTL time.Duration
 }
 
-// LoadConfig загружает конфигурацию из файла и переменных окружения
+// LoadConfig loads configuration from file and environment variables
 func LoadConfig(configPath string) (*Config, error) {
 	viper.SetConfigFile(configPath)
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err != nil {
-		return nil, fmt.Errorf("ошибка чтения конфигурации: %w", err)
+		return nil, fmt.Errorf("error reading configuration: %w", err)
 	}
 
 	var cfg Config
 	if err := viper.Unmarshal(&cfg); err != nil {
-		return nil, fmt.Errorf("ошибка десериализации конфигурации: %w", err)
+		return nil, fmt.Errorf("error deserializing configuration: %w", err)
 	}
 
 	return &cfg, nil
 }
 
-// GetDSN возвращает строку подключения к PostgreSQL
+// GetDSN returns PostgreSQL connection string
 func (c *DatabaseConfig) GetDSN() string {
 	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		c.Host, c.Port, c.User, c.Password, c.DBName, c.SSLMode)
 }
 
-// GetRedisAddr возвращает адрес подключения к Redis
+// GetRedisAddr returns Redis connection address
 func (c *RedisConfig) GetRedisAddr() string {
 	return fmt.Sprintf("%s:%d", c.Host, c.Port)
 }

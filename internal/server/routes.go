@@ -7,76 +7,76 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// registerRoutes регистрирует все маршруты API
+// registerRoutes registers all API routes
 func (s *Server) registerRoutes() {
 	e := s.echo
 
-	// Группа для API v1
+	// API v1 group
 	v1 := e.Group("/api/v1")
 
-	// Публичные маршруты
+	// Public routes
 	public := v1.Group("")
 	public.GET("/health", s.HealthCheck)
 
-	// Регистрируем маршруты для книг
+	// Register book routes
 	s.bookModule.RegisterRoutes(v1)
 
-	// Маршруты для аутентификации
+	// Authentication routes
 	auth := public.Group("/auth")
 	auth.POST("/register", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]string{"message": "Регистрация"})
+		return c.JSON(http.StatusOK, map[string]string{"message": "Registration"})
 	})
 	auth.POST("/login", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]string{"message": "Вход"})
+		return c.JSON(http.StatusOK, map[string]string{"message": "Login"})
 	})
 
-	// Создаем конфигурацию JWT
+	// Create JWT configuration
 	jwtConfig := middleware.NewJWTConfig(s.config.JWT.Secret)
 
-	// Защищенные маршруты (требуют аутентификации)
+	// Protected routes (require authentication)
 	protected := v1.Group("")
 	protected.Use(middleware.AuthMiddleware(jwtConfig))
 
-	// Маршруты для корзины
+	// Cart routes
 	cart := protected.Group("/cart")
 	cart.GET("", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]string{"message": "Корзина пользователя"})
+		return c.JSON(http.StatusOK, map[string]string{"message": "User cart"})
 	})
 	cart.POST("/items", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]string{"message": "Добавление товара в корзину"})
+		return c.JSON(http.StatusOK, map[string]string{"message": "Add item to cart"})
 	})
 	cart.DELETE("/items/:id", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]string{"message": "Удаление товара из корзины"})
+		return c.JSON(http.StatusOK, map[string]string{"message": "Remove item from cart"})
 	})
 
-	// Маршруты для оформления заказа
+	// Checkout routes
 	s.checkoutHandler.RegisterRoutes(protected)
 
-	// Маршруты для администраторов
+	// Admin routes
 	admin := protected.Group("/admin")
 	admin.Use(middleware.AdminMiddleware())
 
-	// Управление категориями
+	// Category management
 	adminCategories := admin.Group("/categories")
 	adminCategories.POST("", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]string{"message": "Создание категории"})
+		return c.JSON(http.StatusOK, map[string]string{"message": "Create category"})
 	})
 	adminCategories.PUT("/:id", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]string{"message": "Обновление категории"})
+		return c.JSON(http.StatusOK, map[string]string{"message": "Update category"})
 	})
 	adminCategories.DELETE("/:id", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]string{"message": "Удаление категории"})
+		return c.JSON(http.StatusOK, map[string]string{"message": "Delete category"})
 	})
 
-	// Управление книгами
+	// Book management
 	adminBooks := admin.Group("/books")
 	adminBooks.POST("", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]string{"message": "Создание книги"})
+		return c.JSON(http.StatusOK, map[string]string{"message": "Create book"})
 	})
 	adminBooks.PUT("/:id", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]string{"message": "Обновление книги"})
+		return c.JSON(http.StatusOK, map[string]string{"message": "Update book"})
 	})
 	adminBooks.DELETE("/:id", func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]string{"message": "Удаление книги"})
+		return c.JSON(http.StatusOK, map[string]string{"message": "Delete book"})
 	})
 }

@@ -2,7 +2,7 @@ package models
 
 import "time"
 
-// Book представляет модель книги
+// Book represents a book model
 type Book struct {
 	ID            int       `json:"id" db:"id"`
 	Title         string    `json:"title" db:"title"`
@@ -16,7 +16,7 @@ type Book struct {
 	UpdatedAt     time.Time `json:"updated_at" db:"updated_at"`
 }
 
-// BookCreate представляет данные для создания книги
+// BookCreate represents data for creating a book
 type BookCreate struct {
 	Title         string  `json:"title" validate:"required"`
 	Author        string  `json:"author" validate:"required"`
@@ -26,7 +26,7 @@ type BookCreate struct {
 	CategoryID    int     `json:"category_id" validate:"required,gt=0"`
 }
 
-// BookUpdate представляет данные для обновления книги
+// BookUpdate represents data for updating a book
 type BookUpdate struct {
 	Title         *string  `json:"title,omitempty"`
 	Author        *string  `json:"author,omitempty"`
@@ -35,7 +35,7 @@ type BookUpdate struct {
 	CategoryID    *int     `json:"category_id,omitempty" validate:"omitempty,gt=0"`
 }
 
-// BookFilter представляет параметры фильтрации книг
+// BookFilter represents book filtering parameters
 type BookFilter struct {
 	CategoryIDs []int    `json:"category_ids" form:"category_ids"`
 	MinPrice    *float64 `json:"min_price,omitempty" form:"min_price"`
@@ -45,7 +45,7 @@ type BookFilter struct {
 	PageSize    int      `json:"page_size" form:"page_size"`
 }
 
-// BookListResponse представляет ответ со списком книг
+// BookListResponse represents a response with a list of books
 type BookListResponse struct {
 	Books      []Book `json:"books"`
 	TotalCount int    `json:"total_count"`

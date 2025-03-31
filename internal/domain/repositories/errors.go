@@ -2,11 +2,11 @@ package repositories
 
 import "errors"
 
-// Определение общих ошибок для репозиториев
+// Definition of common repository errors
 var (
-	// ErrNotFound возвращается, когда запись не найдена
-	ErrNotFound = errors.New("запись не найдена")
+	// ErrNotFound is returned when a record is not found
+	ErrNotFound = errors.New("record not found")
 
-	// ErrDuplicateKey возвращается при нарушении уникальности
-	ErrDuplicateKey = errors.New("запись с таким ключом уже существует")
+	// ErrDuplicateKey is returned when a uniqueness constraint is violated
+	ErrDuplicateKey = errors.New("record with this key already exists")
 )

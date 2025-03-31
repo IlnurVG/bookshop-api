@@ -6,27 +6,26 @@ import (
 	"github.com/bookshop/api/internal/domain/models"
 )
 
-// CategoryRepository определяет методы для работы с категориями в хранилище
+// CategoryRepository defines methods for working with categories in storage
 type CategoryRepository interface {
-	// Create создает новую категорию
+	// Create creates a new category
 	Create(ctx context.Context, category *models.Category) error
 
-	// GetByID возвращает категорию по ID
+	// GetByID returns a category by ID
 	GetByID(ctx context.Context, id int) (*models.Category, error)
 
-	// GetByName возвращает категорию по имени
+	// GetByName returns a category by name
 	GetByName(ctx context.Context, name string) (*models.Category, error)
 
-	// List возвращает список всех категорий
+	// List returns a list of all categories
 	List(ctx context.Context) ([]models.Category, error)
 
-	// Update обновляет данные категории
+	// Update updates category data
 	Update(ctx context.Context, category *models.Category) error
 
-	// Delete удаляет категорию по ID
+	// Delete deletes a category by ID
 	Delete(ctx context.Context, id int) error
 
-	// GetCategoriesByIDs возвращает категории по списку ID
+	// GetCategoriesByIDs returns categories by a list of IDs
 	GetCategoriesByIDs(ctx context.Context, ids []int) ([]models.Category, error)
 }
-

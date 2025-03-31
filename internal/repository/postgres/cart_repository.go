@@ -12,19 +12,19 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// CartRepository реализует интерфейс repositories.CartRepository
+// CartRepository implements repositories.CartRepository interface
 type CartRepository struct {
 	db *pgxpool.Pool
 }
 
-// NewCartRepository создает новый экземпляр CartRepository
+// NewCartRepository creates a new instance of CartRepository
 func NewCartRepository(db *pgxpool.Pool) repositories.CartRepository {
 	return &CartRepository{
 		db: db,
 	}
 }
 
-// AddItem добавляет товар в корзину пользователя
+// AddItem adds an item to the user's cart
 func (r *CartRepository) AddItem(ctx context.Context, userID int, bookID int, expiresAt time.Time) error {
 	query := `
 		INSERT INTO cart_items (user_id, book_id, added_at, expires_at)
@@ -35,13 +35,13 @@ func (r *CartRepository) AddItem(ctx context.Context, userID int, bookID int, ex
 
 	_, err := r.db.Exec(ctx, query, userID, bookID, time.Now(), expiresAt)
 	if err != nil {
-		return fmt.Errorf("ошибка добавления товара в корзину: %w", err)
+		return fmt.Errorf("failed to add item to cart: %w", err)
 	}
 
 	return nil
 }
 
-// GetCart возвращает корзину пользователя
+// GetCart returns the user's cart
 func (r *CartRepository) GetCart(ctx context.Context, userID int) (*models.Cart, error) {
 	query := `
 		SELECT ci.book_id, ci.added_at, ci.expires_at
@@ -52,7 +52,7 @@ func (r *CartRepository) GetCart(ctx context.Context, userID int) (*models.Cart,
 
 	rows, err := r.db.Query(ctx, query, userID, time.Now())
 	if err != nil {
-		return nil, fmt.Errorf("ошибка получения корзины: %w", err)
+		return nil, fmt.Errorf("failed to get cart: %w", err)
 	}
 	defer rows.Close()
 
@@ -69,19 +69,19 @@ func (r *CartRepository) GetCart(ctx context.Context, userID int) (*models.Cart,
 			&item.ExpiresAt,
 		)
 		if err != nil {
-			return nil, fmt.Errorf("ошибка сканирования данных элемента корзины: %w", err)
+			return nil, fmt.Errorf("failed to scan cart item data: %w", err)
 		}
 		cart.Items = append(cart.Items, item)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("ошибка при итерации по результатам: %w", err)
+		return nil, fmt.Errorf("failed to iterate through results: %w", err)
 	}
 
 	return cart, nil
 }
 
-// RemoveItem удаляет товар из корзины пользователя
+// RemoveItem removes an item from the user's cart
 func (r *CartRepository) RemoveItem(ctx context.Context, userID int, bookID int) error {
 	query := `
 		DELETE FROM cart_items
@@ -90,13 +90,13 @@ func (r *CartRepository) RemoveItem(ctx context.Context, userID int, bookID int)
 
 	_, err := r.db.Exec(ctx, query, userID, bookID)
 	if err != nil {
-		return fmt.Errorf("ошибка удаления товара из корзины: %w", err)
+		return fmt.Errorf("failed to remove item from cart: %w", err)
 	}
 
 	return nil
 }
 
-// ClearCart очищает корзину пользователя
+// ClearCart clears the user's cart
 func (r *CartRepository) ClearCart(ctx context.Context, userID int) error {
 	query := `
 		DELETE FROM cart_items
@@ -105,13 +105,13 @@ func (r *CartRepository) ClearCart(ctx context.Context, userID int) error {
 
 	_, err := r.db.Exec(ctx, query, userID)
 	if err != nil {
-		return fmt.Errorf("ошибка очистки корзины: %w", err)
+		return fmt.Errorf("failed to clear cart: %w", err)
 	}
 
 	return nil
 }
 
-// GetExpiredCarts возвращает список истекших корзин
+// GetExpiredCarts returns a list of expired carts
 func (r *CartRepository) GetExpiredCarts(ctx context.Context) ([]models.Cart, error) {
 	query := `
 		SELECT DISTINCT user_id
@@ -121,7 +121,7 @@ func (r *CartRepository) GetExpiredCarts(ctx context.Context) ([]models.Cart, er
 
 	rows, err := r.db.Query(ctx, query, time.Now())
 	if err != nil {
-		return nil, fmt.Errorf("ошибка получения истекших корзин: %w", err)
+		return nil, fmt.Errorf("failed to get expired carts: %w", err)
 	}
 	defer rows.Close()
 
@@ -130,19 +130,19 @@ func (r *CartRepository) GetExpiredCarts(ctx context.Context) ([]models.Cart, er
 		cart := models.Cart{}
 		err := rows.Scan(&cart.UserID)
 		if err != nil {
-			return nil, fmt.Errorf("ошибка сканирования данных корзины: %w", err)
+			return nil, fmt.Errorf("failed to scan cart data: %w", err)
 		}
 		carts = append(carts, cart)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("ошибка при итерации по результатам: %w", err)
+		return nil, fmt.Errorf("failed to iterate through results: %w", err)
 	}
 
 	return carts, nil
 }
 
-// RemoveExpiredItems удаляет истекшие товары из корзин
+// RemoveExpiredItems removes expired items from carts
 func (r *CartRepository) RemoveExpiredItems(ctx context.Context) error {
 	query := `
 		DELETE FROM cart_items
@@ -151,21 +151,21 @@ func (r *CartRepository) RemoveExpiredItems(ctx context.Context) error {
 
 	_, err := r.db.Exec(ctx, query, time.Now())
 	if err != nil {
-		return fmt.Errorf("ошибка удаления истекших товаров: %w", err)
+		return fmt.Errorf("failed to remove expired items: %w", err)
 	}
 
 	return nil
 }
 
-// LockCart блокирует корзину на время оформления заказа
+// LockCart locks the cart during order checkout
 func (r *CartRepository) LockCart(ctx context.Context, userID int, duration time.Duration) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("ошибка начала транзакции: %w", err)
+		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback(ctx)
 
-	// Проверяем, не заблокирована ли уже корзина
+	// Check if the cart is already locked
 	lockQuery := `
 		SELECT 1
 		FROM cart_locks
@@ -175,15 +175,15 @@ func (r *CartRepository) LockCart(ctx context.Context, userID int, duration time
 	var exists int
 	err = tx.QueryRow(ctx, lockQuery, userID, time.Now()).Scan(&exists)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return fmt.Errorf("ошибка проверки блокировки корзины: %w", err)
+		return fmt.Errorf("failed to check cart lock: %w", err)
 	}
 
 	if err == nil {
-		// Корзина уже заблокирована
-		return fmt.Errorf("корзина уже заблокирована")
+		// Cart is already locked
+		return fmt.Errorf("cart is already locked")
 	}
 
-	// Блокируем корзину
+	// Lock the cart
 	insertQuery := `
 		INSERT INTO cart_locks (user_id, locked_until)
 		VALUES ($1, $2)
@@ -193,17 +193,17 @@ func (r *CartRepository) LockCart(ctx context.Context, userID int, duration time
 
 	_, err = tx.Exec(ctx, insertQuery, userID, time.Now().Add(duration))
 	if err != nil {
-		return fmt.Errorf("ошибка блокировки корзины: %w", err)
+		return fmt.Errorf("failed to lock cart: %w", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("ошибка фиксации транзакции: %w", err)
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil
 }
 
-// UnlockCart разблокирует корзину
+// UnlockCart unlocks the cart
 func (r *CartRepository) UnlockCart(ctx context.Context, userID int) error {
 	query := `
 		DELETE FROM cart_locks
@@ -212,7 +212,7 @@ func (r *CartRepository) UnlockCart(ctx context.Context, userID int) error {
 
 	_, err := r.db.Exec(ctx, query, userID)
 	if err != nil {
-		return fmt.Errorf("ошибка разблокировки корзины: %w", err)
+		return fmt.Errorf("failed to unlock cart: %w", err)
 	}
 
 	return nil

@@ -18,7 +18,7 @@ func NewPostgresDB(cfg config.DatabaseConfig) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("error parsing database config: %w", err)
 	}
 
-	// Убедимся, что MaxConns не меньше 1
+	// Make sure MaxConns is not less than 1
 	maxConns := int32(cfg.MaxConns)
 	if maxConns < 1 {
 		maxConns = 1

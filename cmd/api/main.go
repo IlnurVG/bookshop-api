@@ -18,82 +18,82 @@ import (
 )
 
 func main() {
-	// Парсинг флагов командной строки
-	configPath := flag.String("config", "./config/config.yaml", "путь к файлу конфигурации")
+	// Parse command line flags
+	configPath := flag.String("config", "./config/config.yaml", "path to configuration file")
 	flag.Parse()
 
-	// Загрузка конфигурации
+	// Load configuration
 	cfg, err := config.LoadConfig(*configPath)
 	if err != nil {
-		log.Fatalf("Ошибка загрузки конфигурации: %v", err)
+		log.Fatalf("Error loading configuration: %v", err)
 	}
 
-	// Инициализация логгера
+	// Initialize logger
 	l, err := logger.NewLogger(cfg.App.LogLevel)
 	if err != nil {
-		log.Fatalf("Ошибка инициализации логгера: %v", err)
+		log.Fatalf("Error initializing logger: %v", err)
 	}
 	defer l.Sync()
 
-	// Инициализация подключения к PostgreSQL
+	// Initialize PostgreSQL connection
 	db, err := postgres.NewPostgresDB(cfg.Database)
 	if err != nil {
-		l.Fatal("Ошибка подключения к базе данных", err)
+		l.Fatal("Database connection error", err)
 	}
 	defer db.Close()
 
-	// Инициализация подключения к Redis
+	// Initialize Redis connection
 	redisClient, err := redis.NewRedisClient(cfg.Redis)
 	if err != nil {
-		l.Fatal("Ошибка подключения к Redis", err)
+		l.Fatal("Redis connection error", err)
 	}
 	defer redisClient.Close()
 
-	// Инициализация репозиториев
+	// Initialize repositories
 	bookRepo := postgres.NewBookRepository(db)
 	categoryRepo := postgres.NewCategoryRepository(db)
 
-	// Инициализация сервера с минимальными зависимостями
+	// Initialize server with minimal dependencies
 	srv, err := server.NewServer(cfg, l, nil, bookRepo, categoryRepo)
 	if err != nil {
-		l.Fatal("Ошибка инициализации сервера", err)
+		l.Fatal("Server initialization error", err)
 	}
 
-	// Запуск сервера в горутине
+	// Start server in a goroutine
 	go func() {
-		l.Info("Запуск HTTP сервера", "адрес", srv.Addr)
+		l.Info("Starting HTTP server", "address", srv.Addr)
 		if err := srv.Start(); err != nil {
-			l.Error("Ошибка запуска сервера", err)
+			l.Error("Server start error", err)
 		}
 	}()
 
-	// Ожидание сигнала для graceful shutdown
+	// Wait for termination signal for graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	l.Info("Завершение работы сервера...")
+	l.Info("Shutting down the server...")
 
-	// Создаем контекст с таймаутом для graceful shutdown
+	// Create a timeout context for graceful shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Останавливаем сервер
+	// Stop the server
 	if err := srv.Shutdown(ctx); err != nil {
-		l.Error("Ошибка при остановке сервера", err)
+		l.Error("Error during server shutdown", err)
 	}
 
-	l.Info("Сервер успешно остановлен")
+	l.Info("Server successfully stopped")
 }
 
-// cartRepositoryAdapter адаптер для CartRepository с поддержкой GetExpiredCarts
+// cartRepositoryAdapter adapter for CartRepository with GetExpiredCarts support
 type cartRepositoryAdapter struct {
 	*redis.CartRepository
 	lockManager *redis.LockManager
 }
 
-// GetExpiredCarts реализация метода для интерфейса repositories.CartRepository
+// GetExpiredCarts implementation of the repositories.CartRepository interface method
 func (a *cartRepositoryAdapter) GetExpiredCarts(ctx context.Context) ([]models.Cart, error) {
-	// Заглушка для метода GetExpiredCarts
+	// Stub for GetExpiredCarts method
 	return []models.Cart{}, nil
 }

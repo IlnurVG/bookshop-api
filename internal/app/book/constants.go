@@ -1,37 +1,37 @@
 package book
 
-// Константы для пагинации
+// Constants for pagination
 const (
-	// DefaultPage - страница по умолчанию
+	// DefaultPage - default page number
 	DefaultPage = 1
 
-	// DefaultPageSize - размер страницы по умолчанию
+	// DefaultPageSize - default page size
 	DefaultPageSize = 10
 
-	// MaxPageSize - максимальный размер страницы
+	// MaxPageSize - maximum page size
 	MaxPageSize = 100
 )
 
-// Константы для сортировки
+// Constants for sorting
 const (
-	// SortByTitle - сортировка по названию
+	// SortByTitle - sort by title
 	SortByTitle = "title"
 
-	// SortByAuthor - сортировка по автору
+	// SortByAuthor - sort by author
 	SortByAuthor = "author"
 
-	// SortByPrice - сортировка по цене
+	// SortByPrice - sort by price
 	SortByPrice = "price"
 
-	// SortByPublished - сортировка по году публикации
+	// SortByPublished - sort by publication year
 	SortByPublished = "year_published"
 
-	// SortByCreated - сортировка по дате создания
+	// SortByCreated - sort by creation date
 	SortByCreated = "created_at"
 
-	// SortAsc - сортировка по возрастанию
+	// SortAsc - ascending sort order
 	SortAsc = "asc"
 
-	// SortDesc - сортировка по убыванию
+	// SortDesc - descending sort order
 	SortDesc = "desc"
 )

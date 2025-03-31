@@ -12,25 +12,25 @@ import (
 	"github.com/bookshop/api/pkg/logger"
 )
 
-// Определение ошибок
+// Error definitions
 var (
-	ErrBookNotFound = errors.New("книга не найдена")
-	ErrCartEmpty    = errors.New("корзина пуста")
+	ErrBookNotFound = errors.New("book not found")
+	ErrCartEmpty    = errors.New("cart is empty")
 )
 
 const (
-	// ItemExpirationTime время жизни товара в корзине
+	// ItemExpirationTime is the lifetime of an item in the cart
 	ItemExpirationTime = 24 * time.Hour
 )
 
-// Service реализует интерфейс services.CartService
+// Service implements services.CartService interface
 type Service struct {
 	cartRepo repositories.CartRepository
 	bookRepo repositories.BookRepository
 	logger   logger.Logger
 }
 
-// NewService создает новый экземпляр сервиса корзины
+// NewService creates a new instance of the cart service
 func NewService(
 	cartRepo repositories.CartRepository,
 	bookRepo repositories.BookRepository,
@@ -43,69 +43,69 @@ func NewService(
 	}
 }
 
-// AddItem добавляет товар в корзину пользователя
+// AddItem adds an item to the user's cart
 func (s *Service) AddItem(ctx context.Context, userID int, input models.CartItemRequest) error {
-	// Проверяем существование книги
+	// Check if the book exists
 	book, err := s.bookRepo.GetByID(ctx, input.BookID)
 	if err != nil {
 		if errors.Is(err, repositories.ErrNotFound) {
 			return ErrBookNotFound
 		}
-		return fmt.Errorf("ошибка получения книги: %w", err)
+		return fmt.Errorf("error getting book: %w", err)
 	}
 
-	// Проверяем наличие книги на складе
+	// Check if the book is in stock
 	if book.Stock <= 0 {
-		return fmt.Errorf("книга отсутствует на складе")
+		return fmt.Errorf("book is out of stock")
 	}
 
-	// Добавляем товар в корзину
+	// Add item to cart
 	expiresAt := time.Now().Add(ItemExpirationTime)
 	if err := s.cartRepo.AddItem(ctx, userID, input.BookID, expiresAt); err != nil {
-		return fmt.Errorf("ошибка добавления товара в корзину: %w", err)
+		return fmt.Errorf("error adding item to cart: %w", err)
 	}
 
 	return nil
 }
 
-// GetCart возвращает корзину пользователя
+// GetCart returns the user's cart
 func (s *Service) GetCart(ctx context.Context, userID int) (*models.CartResponse, error) {
-	// Получаем корзину пользователя
+	// Get user's cart
 	cart, err := s.cartRepo.GetCart(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("ошибка получения корзины: %w", err)
+		return nil, fmt.Errorf("error getting cart: %w", err)
 	}
 
-	// Преобразуем модель в ответ
+	// Convert model to response
 	response := cart.ToResponse()
 	return &response, nil
 }
 
-// RemoveItem удаляет товар из корзины пользователя
+// RemoveItem removes an item from the user's cart
 func (s *Service) RemoveItem(ctx context.Context, userID int, bookID int) error {
-	// Удаляем товар из корзины
+	// Remove item from cart
 	if err := s.cartRepo.RemoveItem(ctx, userID, bookID); err != nil {
-		return fmt.Errorf("ошибка удаления товара из корзины: %w", err)
+		return fmt.Errorf("error removing item from cart: %w", err)
 	}
 
 	return nil
 }
 
-// ClearCart очищает корзину пользователя
+// ClearCart clears the user's cart
 func (s *Service) ClearCart(ctx context.Context, userID int) error {
-	// Очищаем корзину
+	// Clear the cart
 	if err := s.cartRepo.ClearCart(ctx, userID); err != nil {
-		return fmt.Errorf("ошибка очистки корзины: %w", err)
+		return fmt.Errorf("error clearing cart: %w", err)
 	}
 
 	return nil
 }
 
-// CleanupExpiredItems удаляет просроченные товары из всех корзин
+// CleanupExpiredItems removes expired items from all carts
 func (s *Service) CleanupExpiredItems(ctx context.Context) error {
-	// Удаляем просроченные товары
+	// Remove expired items
 	if err := s.cartRepo.RemoveExpiredItems(ctx); err != nil {
-		return fmt.Errorf("ошибка удаления просроченных товаров: %w", err)
+		return fmt.Errorf("error removing expired items: %w", err)
 	}
 
 	return nil

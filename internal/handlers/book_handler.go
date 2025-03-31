@@ -9,40 +9,40 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// BookHandler обрабатывает запросы, связанные с книгами
+// BookHandler handles requests related to books
 type BookHandler struct {
 	bookService services.BookService
 }
 
-// NewBookHandler создает новый экземпляр BookHandler
+// NewBookHandler creates a new instance of BookHandler
 func NewBookHandler(bookService services.BookService) *BookHandler {
 	return &BookHandler{
 		bookService: bookService,
 	}
 }
 
-// RegisterRoutes регистрирует маршруты для обработки запросов к книгам
+// RegisterRoutes registers routes for handling book requests
 func (h *BookHandler) RegisterRoutes(router *echo.Group) {
 	books := router.Group("/books")
 
-	// Публичные маршруты
+	// Public routes
 	books.GET("", h.listBooks)
 	books.GET("/:id", h.getBook)
 
-	// Маршруты для администраторов
+	// Admin routes
 	admin := router.Group("/admin/books")
 	admin.POST("", h.createBook)
 	admin.PUT("/:id", h.updateBook)
 	admin.DELETE("/:id", h.deleteBook)
 }
 
-// createBook обрабатывает запрос на создание книги
-// @Summary Создать книгу
-// @Description Создает новую книгу
+// createBook handles the request to create a book
+// @Summary Create book
+// @Description Creates a new book
 // @Tags admin,books
 // @Accept json
 // @Produce json
-// @Param book body models.BookCreate true "Данные книги"
+// @Param book body models.BookCreate true "Book data"
 // @Success 201 {object} models.Book
 // @Failure 400 {object} ErrorResponse
 // @Failure 401 {object} ErrorResponse
@@ -51,15 +51,15 @@ func (h *BookHandler) RegisterRoutes(router *echo.Group) {
 func (h *BookHandler) createBook(c echo.Context) error {
 	var req models.BookCreate
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "неверный формат запроса"})
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request format"})
 	}
 
-	// Валидация запроса
+	// Validate request
 	if err := c.Validate(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 
-	// Создаем книгу
+	// Create book
 	book, err := h.bookService.Create(c.Request().Context(), req)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
@@ -68,58 +68,58 @@ func (h *BookHandler) createBook(c echo.Context) error {
 	return c.JSON(http.StatusCreated, book)
 }
 
-// getBook обрабатывает запрос на получение информации о книге
-// @Summary Получить книгу
-// @Description Возвращает информацию о книге по ID
+// getBook handles the request to get book information
+// @Summary Get book
+// @Description Returns book information by ID
 // @Tags books
 // @Accept json
 // @Produce json
-// @Param id path int true "ID книги"
+// @Param id path int true "Book ID"
 // @Success 200 {object} models.Book
 // @Failure 400 {object} ErrorResponse
 // @Failure 404 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
 // @Router /books/{id} [get]
 func (h *BookHandler) getBook(c echo.Context) error {
-	// Получаем ID книги из параметров запроса
+	// Get book ID from request parameters
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "некорректный ID книги"})
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid book ID"})
 	}
 
-	// Получаем книгу
+	// Get book
 	book, err := h.bookService.GetByID(c.Request().Context(), id)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, map[string]string{"error": "книга не найдена"})
+		return c.JSON(http.StatusNotFound, map[string]string{"error": "book not found"})
 	}
 
 	return c.JSON(http.StatusOK, book)
 }
 
-// listBooks обрабатывает запрос на получение списка книг
-// @Summary Получить список книг
-// @Description Возвращает список книг с фильтрацией
+// listBooks handles the request to get a list of books
+// @Summary Get book list
+// @Description Returns a filtered list of books
 // @Tags books
 // @Accept json
 // @Produce json
-// @Param category_ids query []int false "ID категорий"
-// @Param min_price query number false "Минимальная цена"
-// @Param max_price query number false "Максимальная цена"
-// @Param in_stock query bool false "Только в наличии"
-// @Param page query int false "Номер страницы"
-// @Param page_size query int false "Размер страницы"
+// @Param category_ids query []int false "Category IDs"
+// @Param min_price query number false "Minimum price"
+// @Param max_price query number false "Maximum price"
+// @Param in_stock query bool false "In stock only"
+// @Param page query int false "Page number"
+// @Param page_size query int false "Page size"
 // @Success 200 {object} models.BookListResponse
 // @Failure 400 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
 // @Router /books [get]
 func (h *BookHandler) listBooks(c echo.Context) error {
-	// Создаем фильтр
+	// Create filter
 	filter := models.BookFilter{
 		Page:     1,
 		PageSize: 10,
 	}
 
-	// Получаем параметры из запроса
+	// Get parameters from request
 	if page, err := strconv.Atoi(c.QueryParam("page")); err == nil && page > 0 {
 		filter.Page = page
 	}
@@ -128,9 +128,9 @@ func (h *BookHandler) listBooks(c echo.Context) error {
 		filter.PageSize = pageSize
 	}
 
-	// Получаем категории
+	// Get categories
 	if categoryIDs := c.QueryParam("category_ids"); categoryIDs != "" {
-		// Парсим список ID категорий
+		// Parse category ID list
 		for _, idStr := range c.QueryParams()["category_ids"] {
 			if id, err := strconv.Atoi(idStr); err == nil && id > 0 {
 				filter.CategoryIDs = append(filter.CategoryIDs, id)
@@ -138,7 +138,7 @@ func (h *BookHandler) listBooks(c echo.Context) error {
 		}
 	}
 
-	// Получаем диапазон цен
+	// Get price range
 	if minPrice, err := strconv.ParseFloat(c.QueryParam("min_price"), 64); err == nil && minPrice >= 0 {
 		filter.MinPrice = &minPrice
 	}
@@ -147,7 +147,7 @@ func (h *BookHandler) listBooks(c echo.Context) error {
 		filter.MaxPrice = &maxPrice
 	}
 
-	// Получаем параметр наличия на складе
+	// Get in stock parameter
 	if inStock := c.QueryParam("in_stock"); inStock != "" {
 		if inStock == "true" {
 			inStockValue := true
@@ -158,7 +158,7 @@ func (h *BookHandler) listBooks(c echo.Context) error {
 		}
 	}
 
-	// Получаем список книг
+	// Get book list
 	books, err := h.bookService.List(c.Request().Context(), filter)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
@@ -167,14 +167,14 @@ func (h *BookHandler) listBooks(c echo.Context) error {
 	return c.JSON(http.StatusOK, books)
 }
 
-// updateBook обрабатывает запрос на обновление книги
-// @Summary Обновить книгу
-// @Description Обновляет данные книги
+// updateBook handles the request to update a book
+// @Summary Update book
+// @Description Updates book data
 // @Tags admin,books
 // @Accept json
 // @Produce json
-// @Param id path int true "ID книги"
-// @Param book body models.BookUpdate true "Данные книги"
+// @Param id path int true "Book ID"
+// @Param book body models.BookUpdate true "Book data"
 // @Success 200 {object} models.Book
 // @Failure 400 {object} ErrorResponse
 // @Failure 401 {object} ErrorResponse
@@ -182,23 +182,23 @@ func (h *BookHandler) listBooks(c echo.Context) error {
 // @Failure 500 {object} ErrorResponse
 // @Router /admin/books/{id} [put]
 func (h *BookHandler) updateBook(c echo.Context) error {
-	// Получаем ID книги из параметров запроса
+	// Get book ID from request parameters
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "некорректный ID книги"})
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid book ID"})
 	}
 
 	var req models.BookUpdate
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "неверный формат запроса"})
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request format"})
 	}
 
-	// Валидация запроса
+	// Validate request
 	if err := c.Validate(&req); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
 	}
 
-	// Обновляем книгу
+	// Update book
 	book, err := h.bookService.Update(c.Request().Context(), id, req)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
@@ -207,13 +207,13 @@ func (h *BookHandler) updateBook(c echo.Context) error {
 	return c.JSON(http.StatusOK, book)
 }
 
-// deleteBook обрабатывает запрос на удаление книги
-// @Summary Удалить книгу
-// @Description Удаляет книгу по ID
+// deleteBook handles the request to delete a book
+// @Summary Delete book
+// @Description Deletes book by ID
 // @Tags admin,books
 // @Accept json
 // @Produce json
-// @Param id path int true "ID книги"
+// @Param id path int true "Book ID"
 // @Success 204 "No Content"
 // @Failure 400 {object} ErrorResponse
 // @Failure 401 {object} ErrorResponse
@@ -221,13 +221,13 @@ func (h *BookHandler) updateBook(c echo.Context) error {
 // @Failure 500 {object} ErrorResponse
 // @Router /admin/books/{id} [delete]
 func (h *BookHandler) deleteBook(c echo.Context) error {
-	// Получаем ID книги из параметров запроса
+	// Get book ID from request parameters
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "некорректный ID книги"})
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid book ID"})
 	}
 
-	// Удаляем книгу
+	// Delete book
 	if err := h.bookService.Delete(c.Request().Context(), id); err != nil {
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}

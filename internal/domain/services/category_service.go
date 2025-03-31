@@ -6,21 +6,20 @@ import (
 	"github.com/bookshop/api/internal/domain/models"
 )
 
-// CategoryService определяет методы для работы с категориями
+// CategoryService defines methods for working with categories
 type CategoryService interface {
-	// Create создает новую категорию
+	// Create creates a new category
 	Create(ctx context.Context, input models.CategoryCreate) (*models.Category, error)
 
-	// GetByID возвращает категорию по ID
+	// GetByID returns a category by ID
 	GetByID(ctx context.Context, id int) (*models.Category, error)
 
-	// List возвращает список всех категорий
+	// List returns a list of all categories
 	List(ctx context.Context) ([]models.Category, error)
 
-	// Update обновляет данные категории
+	// Update updates category data
 	Update(ctx context.Context, id int, input models.CategoryUpdate) (*models.Category, error)
 
-	// Delete удаляет категорию по ID
+	// Delete deletes a category by ID
 	Delete(ctx context.Context, id int) error
 }
-

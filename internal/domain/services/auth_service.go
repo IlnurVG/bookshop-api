@@ -6,24 +6,23 @@ import (
 	"github.com/bookshop/api/internal/domain/models"
 )
 
-// AuthService определяет методы для работы с аутентификацией
+// AuthService defines methods for authentication
 type AuthService interface {
-	// Register регистрирует нового пользователя
+	// Register registers a new user
 	Register(ctx context.Context, input models.UserRegistration) (*models.User, error)
 
-	// Login аутентифицирует пользователя и возвращает токены
+	// Login authenticates a user and returns tokens
 	Login(ctx context.Context, input models.UserCredentials) (string, string, error)
 
-	// ValidateToken проверяет токен и возвращает ID пользователя
+	// ValidateToken validates a token and returns the user ID
 	ValidateToken(ctx context.Context, token string) (int, error)
 
-	// RefreshToken обновляет токен доступа
+	// RefreshToken refreshes the access token
 	RefreshToken(ctx context.Context, refreshToken string) (string, string, error)
 
-	// GetUserByID возвращает пользователя по ID
+	// GetUserByID returns a user by ID
 	GetUserByID(ctx context.Context, id int) (*models.User, error)
 
-	// IsAdmin проверяет, является ли пользователь администратором
+	// IsAdmin checks if the user is an administrator
 	IsAdmin(ctx context.Context, userID int) (bool, error)
 }
-

@@ -8,17 +8,17 @@ import (
 	"github.com/go-playground/validator/v10"
 )
 
-// Validator представляет валидатор для структур
+// Validator represents a validator for structs
 type Validator struct {
 	validate *validator.Validate
 }
 
-// NewValidator создает новый экземпляр валидатора
+// NewValidator creates a new validator instance
 func NewValidator() *Validator {
-	v := validator.New()
+	validate := validator.New()
 
-	// Регистрация функции для получения имен полей из json тегов
-	v.RegisterTagNameFunc(func(fld reflect.StructField) string {
+	// Register function to get field names from json tags
+	validate.RegisterTagNameFunc(func(fld reflect.StructField) string {
 		name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
 		if name == "-" {
 			return ""
@@ -26,86 +26,68 @@ func NewValidator() *Validator {
 		return name
 	})
 
-	return &Validator{
-		validate: v,
-	}
+	return &Validator{validate: validate}
 }
 
-// Validate проверяет структуру на соответствие правилам валидации
+// Validate validates a struct according to validation rules
 func (v *Validator) Validate(i interface{}) error {
 	if err := v.validate.Struct(i); err != nil {
-		return formatValidationErrors(err)
+		if validationErrors, ok := err.(validator.ValidationErrors); ok {
+			return &ValidationErrors{Errors: validationErrors}
+		}
+		return err
 	}
 	return nil
 }
 
-// ValidationError представляет ошибку валидации
+// ValidationError represents a validation error
 type ValidationError struct {
-	Field   string `json:"field"`
-	Message string `json:"message"`
+	Field string
+	Tag   string
+	Value interface{}
 }
 
-// ValidationErrors представляет список ошибок валидации
+// ValidationErrors represents a list of validation errors
 type ValidationErrors struct {
-	Errors []ValidationError `json:"errors"`
+	Errors validator.ValidationErrors
 }
 
-// Error возвращает строковое представление ошибок валидации
-func (ve ValidationErrors) Error() string {
-	var sb strings.Builder
-	sb.WriteString("ошибки валидации: ")
-	for i, err := range ve.Errors {
-		if i > 0 {
-			sb.WriteString(", ")
-		}
-		sb.WriteString(fmt.Sprintf("%s: %s", err.Field, err.Message))
-	}
-	return sb.String()
+// Error returns a string representation of validation errors
+func (e *ValidationErrors) Error() string {
+	return formatValidationErrors(e.Errors)
 }
 
-// formatValidationErrors форматирует ошибки валидации в удобный формат
-func formatValidationErrors(err error) error {
-	if err == nil {
-		return nil
-	}
-
-	var validationErrors ValidationErrors
-
-	for _, err := range err.(validator.ValidationErrors) {
+// formatValidationErrors formats validation errors into a readable format
+func formatValidationErrors(errors validator.ValidationErrors) string {
+	var messages []string
+	for _, err := range errors {
 		field := err.Field()
-		message := getErrorMessage(err)
-
-		validationErrors.Errors = append(validationErrors.Errors, ValidationError{
-			Field:   field,
-			Message: message,
-		})
+		tag := err.Tag()
+		value := err.Value()
+		message := getErrorMessage(field, tag, value)
+		messages = append(messages, message)
 	}
-
-	return validationErrors
+	return strings.Join(messages, "; ")
 }
 
-// getErrorMessage возвращает сообщение об ошибке в зависимости от тега валидации
-func getErrorMessage(err validator.FieldError) string {
-	switch err.Tag() {
+// getErrorMessage returns an error message based on the validation tag
+func getErrorMessage(field, tag string, value interface{}) string {
+	switch tag {
 	case "required":
-		return "обязательное поле"
+		return fmt.Sprintf("%s is required", field)
 	case "email":
-		return "некорректный email"
+		return fmt.Sprintf("%s must be a valid email address", field)
 	case "min":
-		return fmt.Sprintf("минимальное значение: %s", err.Param())
+		return fmt.Sprintf("%s must be at least %v characters", field, value)
 	case "max":
-		return fmt.Sprintf("максимальное значение: %s", err.Param())
-	case "len":
-		return fmt.Sprintf("требуемая длина: %s", err.Param())
-	case "gt":
-		return fmt.Sprintf("должно быть больше %s", err.Param())
-	case "gte":
-		return fmt.Sprintf("должно быть больше или равно %s", err.Param())
-	case "lt":
-		return fmt.Sprintf("должно быть меньше %s", err.Param())
-	case "lte":
-		return fmt.Sprintf("должно быть меньше или равно %s", err.Param())
+		return fmt.Sprintf("%s must be at most %v characters", field, value)
+	case "numeric":
+		return fmt.Sprintf("%s must be numeric", field)
+	case "alpha":
+		return fmt.Sprintf("%s must contain only letters", field)
+	case "alphanum":
+		return fmt.Sprintf("%s must contain only letters and numbers", field)
 	default:
-		return fmt.Sprintf("не соответствует правилу: %s", err.Tag())
+		return fmt.Sprintf("%s is invalid", field)
 	}
 }

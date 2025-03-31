@@ -6,13 +6,13 @@ import (
 	"github.com/bookshop/api/internal/domain/models"
 )
 
-// CreateOrderRequest представляет запрос на создание заказа
+// CreateOrderRequest represents an order creation request
 type CreateOrderRequest struct {
 	DeliveryAddress string `json:"delivery_address" validate:"required,min=10,max=200"`
 	PaymentMethod   string `json:"payment_method" validate:"required,oneof=card cash"`
 }
 
-// OrderItemResponse представляет элемент заказа в ответе API
+// OrderItemResponse represents an order item in the API response
 type OrderItemResponse struct {
 	BookID int     `json:"book_id"`
 	Title  string  `json:"title"`
@@ -20,7 +20,7 @@ type OrderItemResponse struct {
 	Price  float64 `json:"price"`
 }
 
-// OrderResponse представляет заказ в ответе API
+// OrderResponse represents an order in the API response
 type OrderResponse struct {
 	ID         int                 `json:"id"`
 	Status     string              `json:"status"`
@@ -29,7 +29,7 @@ type OrderResponse struct {
 	CreatedAt  time.Time           `json:"created_at"`
 }
 
-// FromModel преобразует модель в ответ API
+// FromModel converts a model to an API response
 func FromModel(order *models.Order) *OrderResponse {
 	response := &OrderResponse{
 		ID:         order.ID,
@@ -53,7 +53,7 @@ func FromModel(order *models.Order) *OrderResponse {
 	return response
 }
 
-// FromModelList преобразует список моделей в список ответов API
+// FromModelList converts a list of models to a list of API responses
 func FromModelList(orders []models.Order) []OrderResponse {
 	result := make([]OrderResponse, len(orders))
 	for i, order := range orders {

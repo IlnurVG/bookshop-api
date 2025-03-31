@@ -5,41 +5,41 @@ import (
 	"fmt"
 )
 
-// Определение ошибок, связанных с книгами
+// Definition of book-related errors
 var (
-	// ErrBookNotFound возвращается, когда книга не найдена
-	ErrBookNotFound = errors.New("книга не найдена")
+	// ErrBookNotFound is returned when a book is not found
+	ErrBookNotFound = errors.New("book not found")
 
-	// ErrInvalidBookID возвращается при некорректном ID книги
-	ErrInvalidBookID = errors.New("некорректный ID книги")
+	// ErrInvalidBookID is returned when a book ID is invalid
+	ErrInvalidBookID = errors.New("invalid book ID")
 
-	// ErrInvalidBookData возвращается при некорректных данных книги
-	ErrInvalidBookData = errors.New("некорректные данные книги")
+	// ErrInvalidBookData is returned when book data is invalid
+	ErrInvalidBookData = errors.New("invalid book data")
 
-	// ErrCategoryNotFound возвращается, когда категория не найдена
-	ErrCategoryNotFound = errors.New("категория не найдена")
+	// ErrCategoryNotFound is returned when a category is not found
+	ErrCategoryNotFound = errors.New("category not found")
 
-	// ErrBookOutOfStock возвращается, когда книга отсутствует на складе
-	ErrBookOutOfStock = errors.New("книга отсутствует на складе")
+	// ErrBookOutOfStock is returned when a book is out of stock
+	ErrBookOutOfStock = errors.New("book is out of stock")
 )
 
-// BookError представляет ошибку, связанную с книгой
+// BookError represents a book-related error
 type BookError struct {
 	ID  int
 	Err error
 }
 
-// Error возвращает строковое представление ошибки
+// Error returns the string representation of the error
 func (e *BookError) Error() string {
-	return fmt.Sprintf("ошибка книги (ID: %d): %v", e.ID, e.Err)
+	return fmt.Sprintf("book error (ID: %d): %v", e.ID, e.Err)
 }
 
-// Unwrap возвращает оригинальную ошибку
+// Unwrap returns the original error
 func (e *BookError) Unwrap() error {
 	return e.Err
 }
 
-// NewBookError создает новую ошибку книги
+// NewBookError creates a new book error
 func NewBookError(id int, err error) *BookError {
 	return &BookError{
 		ID:  id,

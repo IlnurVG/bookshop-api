@@ -2,24 +2,24 @@ package auth
 
 import "time"
 
-// RegisterRequest представляет запрос на регистрацию пользователя
+// RegisterRequest represents a user registration request
 type RegisterRequest struct {
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required,min=6"`
 }
 
-// LoginRequest представляет запрос на аутентификацию пользователя
+// LoginRequest represents a user authentication request
 type LoginRequest struct {
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required"`
 }
 
-// RefreshTokenRequest представляет запрос на обновление токена
+// RefreshTokenRequest represents a token refresh request
 type RefreshTokenRequest struct {
 	RefreshToken string `json:"refresh_token" validate:"required"`
 }
 
-// UserResponse представляет ответ с информацией о пользователе
+// UserResponse represents a response with user information
 type UserResponse struct {
 	ID        int       `json:"id"`
 	Email     string    `json:"email"`
@@ -28,7 +28,7 @@ type UserResponse struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// TokenResponse представляет ответ с токенами
+// TokenResponse represents a response with tokens
 type TokenResponse struct {
 	AccessToken  string    `json:"access_token"`
 	RefreshToken string    `json:"refresh_token"`

@@ -8,13 +8,13 @@ import (
 	"github.com/bookshop/api/pkg/logger"
 )
 
-// Recovery восстанавливает работу после паники
+// Recovery recovers from panics
 func Recovery(log logger.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			defer func() {
 				if err := recover(); err != nil {
-					// Логируем информацию о панике
+					// Log panic information
 					errMsg := fmt.Sprintf("panic recovered: %v", err)
 					log.Error(errMsg, fmt.Errorf("%v\nstack: %s\npath: %s\nmethod: %s",
 						err,
@@ -22,7 +22,7 @@ func Recovery(log logger.Logger) func(http.Handler) http.Handler {
 						r.URL.Path,
 						r.Method))
 
-					// Отправляем ответ с ошибкой
+					// Send error response
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusInternalServerError)
 					fmt.Fprintf(w, `{"error":"internal server error"}`)

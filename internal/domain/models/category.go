@@ -2,7 +2,7 @@ package models
 
 import "time"
 
-// Category представляет модель категории книг
+// Category represents a book category model
 type Category struct {
 	ID        int       `json:"id" db:"id"`
 	Name      string    `json:"name" db:"name"`
@@ -10,23 +10,23 @@ type Category struct {
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
 
-// CategoryCreate представляет данные для создания категории
+// CategoryCreate represents data for creating a category
 type CategoryCreate struct {
 	Name string `json:"name" validate:"required"`
 }
 
-// CategoryUpdate представляет данные для обновления категории
+// CategoryUpdate represents data for updating a category
 type CategoryUpdate struct {
 	Name string `json:"name" validate:"required"`
 }
 
-// CategoryResponse представляет ответ с категорией
+// CategoryResponse represents a category response
 type CategoryResponse struct {
 	ID   int    `json:"id"`
 	Name string `json:"name"`
 }
 
-// ToResponse преобразует модель категории в ответ API
+// ToResponse converts a category model to API response
 func (c *Category) ToResponse() CategoryResponse {
 	return CategoryResponse{
 		ID:   c.ID,
