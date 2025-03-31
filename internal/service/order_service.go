@@ -15,13 +15,14 @@ import (
 
 // OrderService handles business logic related to orders
 type OrderService struct {
-	orderRepo    repositories.OrderRepository
-	userRepo     repositories.UserRepository
-	bookRepo     repositories.BookRepository
-	cartRepo     repositories.CartRepository // Used for cart management
-	profileCache *cache.ProfileCache         // L1 cache for user profiles
-	logger       logger.Logger
-	txManager    repositories.TransactionManager
+	orderRepo      repositories.OrderRepository
+	userRepo       repositories.UserRepository
+	bookRepo       repositories.BookRepository
+	cartRepo       repositories.CartRepository // Used for cart management
+	profileCache   *cache.ProfileCache         // L1 cache for user profiles
+	logger         logger.Logger
+	txManager      repositories.TransactionManager
+	orderProcessor *OrderProcessor // Асинхронный обработчик заказов
 }
 
 // NewOrderService creates a new service for working with orders
@@ -36,14 +37,24 @@ func NewOrderService(
 	// Create in-memory cache with 2-second TTL and 1-second cleanup interval
 	profileCache := cache.NewProfileCache(2*time.Second, 1*time.Second)
 
+	// Create order processor with 5 workers
+	orderProcessor := NewOrderProcessor(
+		orderRepo,
+		bookRepo,
+		cartRepo,
+		logger,
+		5, // Number of workers
+	)
+
 	return &OrderService{
-		orderRepo:    orderRepo,
-		userRepo:     userRepo,
-		bookRepo:     bookRepo,
-		cartRepo:     cartRepo,
-		profileCache: profileCache,
-		txManager:    txManager,
-		logger:       logger,
+		orderRepo:      orderRepo,
+		userRepo:       userRepo,
+		bookRepo:       bookRepo,
+		cartRepo:       cartRepo,
+		profileCache:   profileCache,
+		txManager:      txManager,
+		logger:         logger,
+		orderProcessor: orderProcessor,
 	}
 }
 
@@ -136,10 +147,13 @@ func (s *OrderService) CreateOrder(ctx context.Context, userID string, input mod
 	}
 
 	var order *models.Order
+	var cart *models.Cart
 
+	// Get cart and validate it within a transaction
 	err = s.txManager.WithTransaction(ctx, func(txCtx context.Context) error {
+		var err error
 		// Get user's cart from Redis
-		cart, err := s.cartRepo.GetCart(txCtx, userIDInt)
+		cart, err = s.cartRepo.GetCart(txCtx, userIDInt)
 		if err != nil {
 			return fmt.Errorf("error getting cart: %w", err)
 		}
@@ -152,7 +166,6 @@ func (s *OrderService) CreateOrder(ctx context.Context, userID string, input mod
 		if err := s.cartRepo.LockCart(txCtx, userIDInt, 5*time.Minute); err != nil {
 			return fmt.Errorf("error locking cart: %w", err)
 		}
-		defer s.cartRepo.UnlockCart(txCtx, userIDInt)
 
 		// Create new order object
 		order = &models.Order{
@@ -163,7 +176,7 @@ func (s *OrderService) CreateOrder(ctx context.Context, userID string, input mod
 			Items:      []models.OrderItem{},
 		}
 
-		// Add items from cart
+		// Calculate total price and populate order items
 		for _, item := range cart.Items {
 			// Get book to get price
 			book, err := s.bookRepo.GetByID(txCtx, item.BookID)
@@ -181,23 +194,42 @@ func (s *OrderService) CreateOrder(ctx context.Context, userID string, input mod
 			order.TotalPrice += book.Price
 		}
 
-		// Create order in database
-		if err := s.orderRepo.Create(txCtx, order); err != nil {
-			return fmt.Errorf("error creating order: %w", err)
-		}
-
-		// Clear cart after successful order creation
-		if err := s.cartRepo.ClearCart(txCtx, userIDInt); err != nil {
-			return fmt.Errorf("error clearing cart: %w", err)
-		}
-
 		return nil
 	})
 
 	if err != nil {
-		s.logger.Error("Failed to create order", "error", err, "userID", userID)
+		s.logger.Error("Failed to prepare order", "error", err, "userID", userID)
 		return nil, err
 	}
+
+	// Send order for asynchronous processing
+	s.logger.Info("Sending order for asynchronous processing", "userID", userID)
+
+	// Create processing request
+	processRequest := OrderProcessRequest{
+		UserID:    userIDInt,
+		CartItems: cart.Items,
+		Order:     order,
+	}
+
+	// Start asynchronous processing
+	resultCh := s.orderProcessor.ProcessOrder(ctx, processRequest)
+
+	// Wait for processing result with timeout
+	select {
+	case err := <-resultCh:
+		if err != nil {
+			s.logger.Error("Error during asynchronous order processing", "error", err, "userID", userID)
+			return nil, fmt.Errorf("order processing error: %w", err)
+		}
+	case <-time.After(500 * time.Millisecond):
+		// If processing takes longer, return the order with "processing" status
+		s.logger.Info("Order is being processed", "orderID", order.ID, "userID", userID)
+		order.Status = "processing"
+	}
+
+	// Unlock the cart as we locked it within the transaction
+	s.cartRepo.UnlockCart(ctx, userIDInt)
 
 	// Invalidate caches
 	// L1 cache - just delete it, it will be recreated on next request
@@ -206,7 +238,7 @@ func (s *OrderService) CreateOrder(ctx context.Context, userID string, input mod
 	// L2 cache (Redis) - also delete
 	s.cartRepo.GetRedisClient().Del(ctx, fmt.Sprintf("user_profile:%s", userID))
 
-	s.logger.Info("Order created successfully", "orderID", order.ID, "userID", userID)
+	s.logger.Info("Order creation process started", "orderID", order.ID, "userID", userID)
 
 	return order, nil
 }
@@ -398,5 +430,9 @@ func (s *OrderService) saveProfileToCache(profile *models.UserProfileResponse) {
 func (s *OrderService) Shutdown() {
 	// Stop cache cleanup goroutine
 	s.profileCache.Stop()
+
+	// Stop the order processor
+	s.orderProcessor.Shutdown()
+
 	s.logger.Info("Order service shutdown completed")
 }
