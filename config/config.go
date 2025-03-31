@@ -65,11 +65,11 @@ type JWTConfig struct {
 
 // LoadConfig loads configuration from environment variables
 // For local development, it will try to load .env file first
-func LoadConfig() (*Config, error) {
+func LoadConfig() (Config, error) {
 	// Load .env file if it exists (for local development)
 	_ = godotenv.Load()
 
-	return &Config{
+	return Config{
 		App:      loadAppConfig(),
 		HTTP:     loadHTTPConfig(),
 		Database: loadDatabaseConfig(),
@@ -121,7 +121,7 @@ func loadRedisConfig() RedisConfig {
 
 func loadJWTConfig() JWTConfig {
 	return JWTConfig{
-		Secret:            getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
+		Secret:            getEnv("JWT_SECRET", "app-secret-key-change-in-production"),
 		AccessTokenTTL:    time.Duration(getEnvAsInt("JWT_ACCESS_TOKEN_TTL_MINUTES", 15)) * time.Minute,
 		RefreshTokenTTL:   time.Duration(getEnvAsInt("JWT_REFRESH_TOKEN_TTL_DAYS", 7)) * 24 * time.Hour,
 		CartExpirationTTL: time.Duration(getEnvAsInt("JWT_CART_EXPIRATION_TTL_HOURS", 24)) * time.Hour,
@@ -146,12 +146,12 @@ func getEnvAsInt(key string, defaultValue int) int {
 }
 
 // GetDSN returns PostgreSQL connection string
-func (c *DatabaseConfig) GetDSN() string {
+func (c DatabaseConfig) GetDSN() string {
 	return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		c.Host, c.Port, c.User, c.Password, c.DBName, c.SSLMode)
 }
 
 // GetRedisAddr returns Redis connection address
-func (c *RedisConfig) GetRedisAddr() string {
+func (c RedisConfig) GetRedisAddr() string {
 	return fmt.Sprintf("%s:%d", c.Host, c.Port)
 }
