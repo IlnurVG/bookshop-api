@@ -1,14 +1,16 @@
 package book
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 
+	domainerrors "github.com/bookshop/api/internal/domain/errors"
 	"github.com/bookshop/api/internal/domain/services"
 	"github.com/labstack/echo/v4"
 )
 
-// Handler processes HTTP requests for book operations
+// Handler handles HTTP requests related to books
 type Handler struct {
 	bookService services.BookService
 }
@@ -17,6 +19,44 @@ type Handler struct {
 func NewHandler(bookService services.BookService) *Handler {
 	return &Handler{
 		bookService: bookService,
+	}
+}
+
+// ErrorResponse represents an error response
+type ErrorResponse struct {
+	Error   string `json:"error"`
+	Code    string `json:"code,omitempty"`    // Error code for client-side error handling
+	Details string `json:"details,omitempty"` // Additional error details if available
+}
+
+// errorResponse creates a consistent error response with just an error message
+func errorResponse(message string) *ErrorResponse {
+	return &ErrorResponse{
+		Error: message,
+	}
+}
+
+// detailedErrorResponse creates a response with error code and details
+func detailedErrorResponse(message, code, details string) *ErrorResponse {
+	return &ErrorResponse{
+		Error:   message,
+		Code:    code,
+		Details: details,
+	}
+}
+
+// handleError maps domain errors to appropriate HTTP responses
+func handleError(c echo.Context, err error) error {
+	switch {
+	case errors.Is(err, domainerrors.ErrNotFound),
+		errors.Is(err, domainerrors.ErrBookNotFound):
+		return c.JSON(http.StatusNotFound, errorResponse(err.Error()))
+	case errors.Is(err, domainerrors.ErrInvalidData):
+		return c.JSON(http.StatusBadRequest, errorResponse(err.Error()))
+	case errors.Is(err, domainerrors.ErrDuplicateKey):
+		return c.JSON(http.StatusConflict, errorResponse(err.Error()))
+	default:
+		return c.JSON(http.StatusInternalServerError, errorResponse(err.Error()))
 	}
 }
 
@@ -36,7 +76,7 @@ func (h *Handler) RegisterRoutes(router *echo.Group) {
 }
 
 // createBook handles book creation request
-// @Summary Create a book
+// @Summary Create a new book
 // @Description Creates a new book
 // @Tags admin,books
 // @Accept json
@@ -50,12 +90,12 @@ func (h *Handler) RegisterRoutes(router *echo.Group) {
 func (h *Handler) createBook(c echo.Context) error {
 	var req CreateBookRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request format"})
+		return c.JSON(http.StatusBadRequest, errorResponse("invalid request format"))
 	}
 
 	// Request validation
 	if err := c.Validate(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return c.JSON(http.StatusBadRequest, errorResponse(err.Error()))
 	}
 
 	// Convert request to model
@@ -64,7 +104,7 @@ func (h *Handler) createBook(c echo.Context) error {
 	// Create book
 	book, err := h.bookService.Create(c.Request().Context(), input)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return handleError(c, err)
 	}
 
 	// Convert model to response
@@ -89,13 +129,13 @@ func (h *Handler) getBook(c echo.Context) error {
 	// Get book ID from request parameters
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid book ID"})
+		return c.JSON(http.StatusBadRequest, errorResponse("invalid book ID"))
 	}
 
 	// Get the book
 	book, err := h.bookService.GetByID(c.Request().Context(), id)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, map[string]string{"error": "book not found"})
+		return handleError(c, err)
 	}
 
 	// Convert model to response
@@ -123,7 +163,7 @@ func (h *Handler) getBook(c echo.Context) error {
 func (h *Handler) listBooks(c echo.Context) error {
 	var req BookListRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request format"})
+		return c.JSON(http.StatusBadRequest, errorResponse("invalid request format"))
 	}
 
 	// Convert request to model
@@ -132,7 +172,7 @@ func (h *Handler) listBooks(c echo.Context) error {
 	// Get list of books
 	books, err := h.bookService.List(c.Request().Context(), filter)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return handleError(c, err)
 	}
 
 	// Convert model to response
@@ -159,17 +199,17 @@ func (h *Handler) updateBook(c echo.Context) error {
 	// Get book ID from request parameters
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid book ID"})
+		return c.JSON(http.StatusBadRequest, errorResponse("invalid book ID"))
 	}
 
 	var req UpdateBookRequest
 	if err := c.Bind(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid request format"})
+		return c.JSON(http.StatusBadRequest, errorResponse("invalid request format"))
 	}
 
 	// Request validation
 	if err := c.Validate(&req); err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return c.JSON(http.StatusBadRequest, errorResponse(err.Error()))
 	}
 
 	// Convert request to model
@@ -178,7 +218,7 @@ func (h *Handler) updateBook(c echo.Context) error {
 	// Update book
 	book, err := h.bookService.Update(c.Request().Context(), id, input)
 	if err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return handleError(c, err)
 	}
 
 	// Convert model to response
@@ -204,18 +244,13 @@ func (h *Handler) deleteBook(c echo.Context) error {
 	// Get book ID from request parameters
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
-		return c.JSON(http.StatusBadRequest, map[string]string{"error": "invalid book ID"})
+		return c.JSON(http.StatusBadRequest, errorResponse("invalid book ID"))
 	}
 
 	// Delete the book
 	if err := h.bookService.Delete(c.Request().Context(), id); err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return handleError(c, err)
 	}
 
 	return c.NoContent(http.StatusNoContent)
-}
-
-// ErrorResponse represents an error response
-type ErrorResponse struct {
-	Error string `json:"error"`
 }
