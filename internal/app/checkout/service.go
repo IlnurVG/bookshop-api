@@ -6,16 +6,11 @@ import (
 	"fmt"
 	"time"
 
+	domainerrors "github.com/bookshop/api/internal/domain/errors"
 	"github.com/bookshop/api/internal/domain/models"
 	"github.com/bookshop/api/internal/domain/repositories"
 	"github.com/bookshop/api/internal/domain/services"
 	"github.com/bookshop/api/pkg/logger"
-)
-
-// Error definitions
-var (
-	ErrEmptyCart  = errors.New("cart is empty")
-	ErrOutOfStock = errors.New("item is out of stock")
 )
 
 const (
@@ -54,73 +49,72 @@ func NewService(
 
 // Checkout processes an order from the user's cart
 func (s *Service) Checkout(ctx context.Context, userID int) (*models.Order, error) {
-	// Lock the cart during checkout
-	if err := s.cartRepo.LockCart(ctx, userID, CartLockDuration); err != nil {
-		return nil, fmt.Errorf("error locking cart: %w", err)
-	}
-	defer s.cartRepo.UnlockCart(ctx, userID)
-
-	// Get the user's cart
+	// Get user's cart
 	cart, err := s.cartRepo.GetCart(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("error getting cart: %w", err)
 	}
 
-	// Check that the cart is not empty
+	// Check if cart is empty
 	if len(cart.Items) == 0 {
-		return nil, ErrEmptyCart
+		return nil, domainerrors.ErrEmptyCart
 	}
 
-	// Check stock availability and calculate total price
-	var totalPrice float64
-	orderItems := make([]models.OrderItem, 0, len(cart.Items))
-	for _, item := range cart.Items {
-		// Get the book
-		book, err := s.bookRepo.GetByID(ctx, item.BookID)
-		if err != nil {
-			return nil, fmt.Errorf("error getting book: %w", err)
-		}
+	// Get books from cart
+	bookIDs := make([]int, len(cart.Items))
+	for i, item := range cart.Items {
+		bookIDs[i] = item.BookID
+	}
 
-		// Check stock availability
+	books, err := s.bookRepo.GetBooksByIDs(ctx, bookIDs)
+	if err != nil {
+		return nil, fmt.Errorf("error getting books: %w", err)
+	}
+
+	// Check if all books are in stock
+	for _, book := range books {
 		if book.Stock <= 0 {
-			return nil, ErrOutOfStock
+			return nil, domainerrors.ErrOutOfStock
 		}
-
-		// Reduce stock quantity
-		book.Stock--
-		if err := s.bookRepo.Update(ctx, book); err != nil {
-			return nil, fmt.Errorf("error updating book quantity: %w", err)
-		}
-
-		// Add item to order
-		orderItems = append(orderItems, models.OrderItem{
-			BookID:    item.BookID,
-			Book:      book,
-			Price:     book.Price,
-			CreatedAt: time.Now(),
-		})
-
-		totalPrice += book.Price
 	}
 
 	// Create order
 	order := &models.Order{
 		UserID:     userID,
 		Status:     OrderStatusNew,
-		TotalPrice: totalPrice,
-		Items:      orderItems,
-		CreatedAt:  time.Now(),
-		UpdatedAt:  time.Now(),
+		TotalPrice: 0,
+		Items:      make([]models.OrderItem, len(cart.Items)),
 	}
 
-	// Save the order
+	// Calculate total price and create order items
+	for i, item := range cart.Items {
+		var book *models.Book
+		for _, b := range books {
+			if b.ID == item.BookID {
+				book = &b
+				break
+			}
+		}
+
+		if book == nil {
+			return nil, domainerrors.ErrBookNotFound
+		}
+
+		order.Items[i] = models.OrderItem{
+			BookID: book.ID,
+			Price:  book.Price,
+		}
+		order.TotalPrice += book.Price
+	}
+
+	// Save order
 	if err := s.orderRepo.Create(ctx, order); err != nil {
 		return nil, fmt.Errorf("error creating order: %w", err)
 	}
 
-	// Clear the cart
+	// Clear cart
 	if err := s.cartRepo.ClearCart(ctx, userID); err != nil {
-		s.logger.Error("error clearing cart after order creation: %v", err)
+		return nil, fmt.Errorf("error clearing cart: %w", err)
 	}
 
 	return order, nil

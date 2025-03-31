@@ -6,16 +6,11 @@ import (
 	"fmt"
 	"time"
 
+	domainerrors "github.com/bookshop/api/internal/domain/errors"
 	"github.com/bookshop/api/internal/domain/models"
 	"github.com/bookshop/api/internal/domain/repositories"
 	"github.com/bookshop/api/internal/domain/services"
 	"github.com/bookshop/api/pkg/logger"
-)
-
-// Error definitions
-var (
-	ErrBookNotFound = errors.New("book not found")
-	ErrCartEmpty    = errors.New("cart is empty")
 )
 
 const (
@@ -49,14 +44,14 @@ func (s *Service) AddItem(ctx context.Context, userID int, input models.CartItem
 	book, err := s.bookRepo.GetByID(ctx, input.BookID)
 	if err != nil {
 		if errors.Is(err, repositories.ErrNotFound) {
-			return ErrBookNotFound
+			return domainerrors.ErrBookNotFound
 		}
 		return fmt.Errorf("error getting book: %w", err)
 	}
 
 	// Check if the book is in stock
 	if book.Stock <= 0 {
-		return fmt.Errorf("book is out of stock")
+		return domainerrors.ErrOutOfStock
 	}
 
 	// Add item to cart

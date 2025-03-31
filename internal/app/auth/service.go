@@ -6,19 +6,12 @@ import (
 	"fmt"
 	"time"
 
+	domainerrors "github.com/bookshop/api/internal/domain/errors"
 	"github.com/bookshop/api/internal/domain/models"
 	"github.com/bookshop/api/internal/domain/repositories"
 	"github.com/bookshop/api/internal/domain/services"
 	"github.com/bookshop/api/pkg/logger"
 	"golang.org/x/crypto/bcrypt"
-)
-
-// Error definitions
-var (
-	ErrInvalidCredentials = errors.New("invalid email or password")
-	ErrUserAlreadyExists  = errors.New("user with this email already exists")
-	ErrInvalidToken       = errors.New("invalid token")
-	ErrTokenExpired       = errors.New("token has expired")
 )
 
 const (
@@ -91,7 +84,7 @@ func (s *Service) Register(ctx context.Context, input models.UserRegistration) (
 	// Save user
 	if err := s.userRepo.Create(ctx, user); err != nil {
 		if errors.Is(err, repositories.ErrDuplicateKey) {
-			return nil, ErrUserAlreadyExists
+			return nil, domainerrors.ErrUserAlreadyExists
 		}
 		return nil, fmt.Errorf("error creating user: %w", err)
 	}
@@ -105,14 +98,14 @@ func (s *Service) Login(ctx context.Context, input models.UserCredentials) (stri
 	user, err := s.userRepo.GetByEmail(ctx, input.Email)
 	if err != nil {
 		if errors.Is(err, repositories.ErrNotFound) {
-			return "", "", ErrInvalidCredentials
+			return "", "", domainerrors.ErrInvalidCredentials
 		}
 		return "", "", fmt.Errorf("error getting user: %w", err)
 	}
 
 	// Check password
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(input.Password)); err != nil {
-		return "", "", ErrInvalidCredentials
+		return "", "", domainerrors.ErrInvalidCredentials
 	}
 
 	// Create access token
@@ -140,19 +133,19 @@ func (s *Service) RefreshToken(ctx context.Context, refreshToken string) (string
 	// Verify refresh token
 	claims, err := s.tokenMgr.ParseToken(refreshToken)
 	if err != nil {
-		return "", "", ErrInvalidToken
+		return "", "", domainerrors.ErrInvalidToken
 	}
 
 	// Check token expiration
 	if time.Now().After(claims.Exp) {
-		return "", "", ErrTokenExpired
+		return "", "", domainerrors.ErrTokenExpired
 	}
 
 	// Get user
 	user, err := s.userRepo.GetByID(ctx, claims.UserID)
 	if err != nil {
 		if errors.Is(err, repositories.ErrNotFound) {
-			return "", "", ErrInvalidToken
+			return "", "", domainerrors.ErrInvalidToken
 		}
 		return "", "", fmt.Errorf("error getting user: %w", err)
 	}

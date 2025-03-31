@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	domainerrors "github.com/bookshop/api/internal/domain/errors"
 	"github.com/bookshop/api/internal/domain/models"
 	"github.com/bookshop/api/internal/domain/services"
 	"github.com/bookshop/api/internal/middleware"
@@ -119,7 +120,7 @@ func (h *CheckoutHandler) getOrderByID(c echo.Context) error {
 	// Get order
 	order, err := h.checkoutService.GetOrderByID(c.Request().Context(), orderID, userID)
 	if err != nil {
-		if errors.Is(err, errors.ErrNotFound) {
+		if errors.Is(err, domainerrors.ErrNotFound) {
 			return c.JSON(http.StatusNotFound, map[string]string{"error": "order not found"})
 		}
 		return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})

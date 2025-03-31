@@ -48,7 +48,7 @@ func main() {
 	categoryRepo := postgres.NewCategoryRepository(db)
 
 	// Initialize server with minimal dependencies
-	srv, err := server.NewServer(cfg, l, nil, bookRepo, categoryRepo)
+	srv, err := server.NewServer(&cfg, l, nil, bookRepo, categoryRepo)
 	if err != nil {
 		l.Fatal("Server initialization error", err)
 	}
