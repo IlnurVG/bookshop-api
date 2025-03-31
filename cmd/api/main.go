@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/bookshop/api/config"
-	"github.com/bookshop/api/internal/domain/models"
 	"github.com/bookshop/api/internal/repository/postgres"
 	"github.com/bookshop/api/internal/repository/redis"
 	"github.com/bookshop/api/internal/server"
@@ -79,16 +78,4 @@ func main() {
 	}
 
 	l.Info("Server successfully stopped")
-}
-
-// cartRepositoryAdapter adapter for CartRepository with GetExpiredCarts support
-type cartRepositoryAdapter struct {
-	*redis.CartRepository
-	lockManager *redis.LockManager
-}
-
-// GetExpiredCarts implementation of the repositories.CartRepository interface method
-func (a *cartRepositoryAdapter) GetExpiredCarts(ctx context.Context) ([]models.Cart, error) {
-	// Stub for GetExpiredCarts method
-	return []models.Cart{}, nil
 }
