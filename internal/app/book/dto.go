@@ -68,8 +68,8 @@ type Category struct {
 	Name string `json:"name"`
 }
 
-// FromModel converts Book model to BookResponse
-func FromModel(book *models.Book) *BookResponse {
+// fromModel converts Book model to BookResponse
+func fromModel(book *models.Book) *BookResponse {
 	response := &BookResponse{
 		ID:            book.ID,
 		Title:         book.Title,
@@ -123,8 +123,8 @@ type BookListResponse struct {
 	TotalPages int            `json:"total_pages"`
 }
 
-// FromModelList converts BookListResponse model to BookListResponse
-func FromModelList(modelResponse *models.BookListResponse) *BookListResponse {
+// fromModelList converts BookListResponse model to BookListResponse
+func fromModelList(modelResponse *models.BookListResponse) *BookListResponse {
 	response := &BookListResponse{
 		TotalCount: modelResponse.TotalCount,
 		Page:       modelResponse.Page,
@@ -135,7 +135,7 @@ func FromModelList(modelResponse *models.BookListResponse) *BookListResponse {
 
 	for _, book := range modelResponse.Books {
 		bookCopy := book // Create a copy to avoid pointer issues
-		response.Books = append(response.Books, *FromModel(&bookCopy))
+		response.Books = append(response.Books, *fromModel(&bookCopy))
 	}
 
 	return response

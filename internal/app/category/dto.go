@@ -6,17 +6,17 @@ import (
 	"github.com/bookshop/api/internal/domain/models"
 )
 
-// CreateCategoryRequest представляет запрос на создание категории
+// CreateCategoryRequest represents a request to create a category
 type CreateCategoryRequest struct {
 	Name string `json:"name" validate:"required,min=2,max=50"`
 }
 
-// UpdateCategoryRequest представляет запрос на обновление категории
+// UpdateCategoryRequest represents a request to update a category
 type UpdateCategoryRequest struct {
 	Name string `json:"name" validate:"required,min=2,max=50"`
 }
 
-// CategoryResponse представляет категорию в ответе API
+// CategoryResponse represents a category in the API response
 type CategoryResponse struct {
 	ID        int       `json:"id"`
 	Name      string    `json:"name"`
@@ -24,8 +24,8 @@ type CategoryResponse struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// FromModel преобразует модель в ответ API
-func FromModel(category *models.Category) *CategoryResponse {
+// fromModel converts a model to an API response
+func fromModel(category *models.Category) *CategoryResponse {
 	return &CategoryResponse{
 		ID:        category.ID,
 		Name:      category.Name,
@@ -34,11 +34,11 @@ func FromModel(category *models.Category) *CategoryResponse {
 	}
 }
 
-// FromModelList преобразует список моделей в список ответов API
-func FromModelList(categories []models.Category) []CategoryResponse {
+// fromModelList converts a list of models to a list of API responses
+func fromModelList(categories []models.Category) []CategoryResponse {
 	result := make([]CategoryResponse, len(categories))
 	for i, category := range categories {
-		result[i] = *FromModel(&category)
+		result[i] = *fromModel(&category)
 	}
 	return result
 }
