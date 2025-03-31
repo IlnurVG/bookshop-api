@@ -9,6 +9,7 @@ import (
 
 	"github.com/bookshop/api/internal/domain/models"
 	"github.com/bookshop/api/internal/domain/repositories"
+	repomodels "github.com/bookshop/api/internal/repository/postgres/models"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -39,20 +40,26 @@ func (r *BookRepository) Create(ctx context.Context, book *models.Book) error {
 	book.CreatedAt = now
 	book.UpdatedAt = now
 
+	// Convert domain model to repository model
+	repoBook := repomodels.FromDomain(book)
+
 	err := r.db.QueryRow(ctx, query,
-		book.Title,
-		book.Author,
-		book.YearPublished,
-		book.Price,
-		book.Stock,
-		book.CategoryID,
-		book.CreatedAt,
-		book.UpdatedAt,
-	).Scan(&book.ID)
+		repoBook.Title,
+		repoBook.Author,
+		repoBook.YearPublished,
+		repoBook.Price,
+		repoBook.Stock,
+		repoBook.CategoryID,
+		repoBook.CreatedAt,
+		repoBook.UpdatedAt,
+	).Scan(&repoBook.ID)
 
 	if err != nil {
 		return fmt.Errorf("failed to create book: %w", err)
 	}
+
+	// Update the domain model with generated ID
+	book.ID = repoBook.ID
 
 	return nil
 }
@@ -69,18 +76,18 @@ func (r *BookRepository) GetByID(ctx context.Context, id int) (*models.Book, err
 		WHERE b.id = $1
 	`
 
-	book := &models.Book{}
+	repoBook := &repomodels.Book{}
 	var categoryName string
 	err := r.db.QueryRow(ctx, query, id).Scan(
-		&book.ID,
-		&book.Title,
-		&book.Author,
-		&book.YearPublished,
-		&book.Price,
-		&book.Stock,
-		&book.CategoryID,
-		&book.CreatedAt,
-		&book.UpdatedAt,
+		&repoBook.ID,
+		&repoBook.Title,
+		&repoBook.Author,
+		&repoBook.YearPublished,
+		&repoBook.Price,
+		&repoBook.Stock,
+		&repoBook.CategoryID,
+		&repoBook.CreatedAt,
+		&repoBook.UpdatedAt,
 		&categoryName,
 	)
 
@@ -91,6 +98,10 @@ func (r *BookRepository) GetByID(ctx context.Context, id int) (*models.Book, err
 		return nil, fmt.Errorf("failed to get book: %w", err)
 	}
 
+	// Convert to domain model
+	book := repoBook.ToDomain()
+
+	// Add category if available
 	if categoryName != "" {
 		book.Category = &models.Category{
 			ID:   book.CategoryID,
@@ -184,9 +195,11 @@ func (r *BookRepository) List(ctx context.Context, filter models.BookFilter) ([]
 	}
 	defer rows.Close()
 
-	books := make([]models.Book, 0)
+	repoBooks := make([]repomodels.Book, 0)
+	categoryNames := make(map[int]string)
+
 	for rows.Next() {
-		book := models.Book{}
+		var book repomodels.Book
 		var categoryName string
 		err := rows.Scan(
 			&book.ID,
@@ -204,43 +217,60 @@ func (r *BookRepository) List(ctx context.Context, filter models.BookFilter) ([]
 			return nil, 0, fmt.Errorf("failed to scan book row: %w", err)
 		}
 
+		repoBooks = append(repoBooks, book)
 		if categoryName != "" {
-			book.Category = &models.Category{
-				ID:   book.CategoryID,
-				Name: categoryName,
-			}
+			categoryNames[book.ID] = categoryName
 		}
-
-		books = append(books, book)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, 0, fmt.Errorf("error iterating through results: %w", err)
+		return nil, 0, fmt.Errorf("error iterating over rows: %w", err)
 	}
 
-	return books, total, nil
+	// Convert repository models to domain models
+	domainBooks := repomodels.BookSliceToDomain(repoBooks)
+
+	// Add category information
+	for i := range domainBooks {
+		bookID := domainBooks[i].ID
+		if categoryName, ok := categoryNames[bookID]; ok {
+			domainBooks[i].Category = &models.Category{
+				ID:   domainBooks[i].CategoryID,
+				Name: categoryName,
+			}
+		}
+	}
+
+	return domainBooks, total, nil
 }
 
-// Update updates a book
+// Update updates book data
 func (r *BookRepository) Update(ctx context.Context, book *models.Book) error {
 	query := `
-		UPDATE books
-		SET title = $1, author = $2, year_published = $3, price = $4, 
-			stock = $5, category_id = $6, updated_at = $7
+		UPDATE books 
+		SET 
+			title = $1, 
+			author = $2, 
+			year_published = $3, 
+			price = $4, 
+			stock = $5, 
+			category_id = $6, 
+			updated_at = $7
 		WHERE id = $8
 	`
 
-	book.UpdatedAt = time.Now()
+	// Convert domain model to repository model
+	repoBook := repomodels.FromDomain(book)
 
 	_, err := r.db.Exec(ctx, query,
-		book.Title,
-		book.Author,
-		book.YearPublished,
-		book.Price,
-		book.Stock,
-		book.CategoryID,
-		book.UpdatedAt,
-		book.ID,
+		repoBook.Title,
+		repoBook.Author,
+		repoBook.YearPublished,
+		repoBook.Price,
+		repoBook.Stock,
+		repoBook.CategoryID,
+		repoBook.UpdatedAt,
+		repoBook.ID,
 	)
 
 	if err != nil {
@@ -252,49 +282,53 @@ func (r *BookRepository) Update(ctx context.Context, book *models.Book) error {
 
 // Delete deletes a book by ID
 func (r *BookRepository) Delete(ctx context.Context, id int) error {
-	query := `
-		DELETE FROM books
-		WHERE id = $1
-	`
+	query := "DELETE FROM books WHERE id = $1"
 
-	_, err := r.db.Exec(ctx, query, id)
+	result, err := r.db.Exec(ctx, query, id)
 	if err != nil {
 		return fmt.Errorf("failed to delete book: %w", err)
 	}
 
-	return nil
-}
-
-// UpdateStock updates the stock of books
-func (r *BookRepository) UpdateStock(ctx context.Context, id int, quantity int) error {
-	query := `
-		UPDATE books
-		SET stock = stock + $1, updated_at = $2
-		WHERE id = $3
-	`
-
-	_, err := r.db.Exec(ctx, query, quantity, time.Now(), id)
-	if err != nil {
-		return fmt.Errorf("failed to update book quantity: %w", err)
+	rowsAffected := result.RowsAffected()
+	if rowsAffected == 0 {
+		return repositories.ErrNotFound
 	}
 
 	return nil
 }
 
-// GetBooksByIDs returns books by list of IDs
+// UpdateStock updates the quantity of books in stock
+func (r *BookRepository) UpdateStock(ctx context.Context, id int, quantity int) error {
+	query := `
+		UPDATE books
+		SET stock = $1, updated_at = $2
+		WHERE id = $3
+	`
+
+	now := time.Now()
+	_, err := r.db.Exec(ctx, query, quantity, now, id)
+	if err != nil {
+		return fmt.Errorf("failed to update book stock: %w", err)
+	}
+
+	return nil
+}
+
+// GetBooksByIDs returns books by a list of IDs
 func (r *BookRepository) GetBooksByIDs(ctx context.Context, ids []int) ([]models.Book, error) {
 	if len(ids) == 0 {
 		return []models.Book{}, nil
 	}
 
-	// Create parameters for query
-	args := make([]interface{}, len(ids))
+	// Prepare the query with placeholders for IDs
 	placeholders := make([]string, len(ids))
+	args := make([]interface{}, len(ids))
 	for i, id := range ids {
-		args[i] = id
 		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		args[i] = id
 	}
 
+	// Build the query
 	query := fmt.Sprintf(`
 		SELECT 
 			b.id, b.title, b.author, b.year_published, b.price, 
@@ -303,17 +337,21 @@ func (r *BookRepository) GetBooksByIDs(ctx context.Context, ids []int) ([]models
 		FROM books b
 		LEFT JOIN categories c ON b.category_id = c.id
 		WHERE b.id IN (%s)
-	`, fmt.Sprintf(strings.Join(placeholders, ",")))
+	`, strings.Join(placeholders, ","))
 
+	// Execute the query
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get books by IDs: %w", err)
+		return nil, fmt.Errorf("failed to query books by IDs: %w", err)
 	}
 	defer rows.Close()
 
-	books := make([]models.Book, 0, len(ids))
+	// Parse the results
+	repoBooks := make([]repomodels.Book, 0, len(ids))
+	categoryNames := make(map[int]string)
+
 	for rows.Next() {
-		book := models.Book{}
+		var book repomodels.Book
 		var categoryName string
 		err := rows.Scan(
 			&book.ID,
@@ -331,24 +369,35 @@ func (r *BookRepository) GetBooksByIDs(ctx context.Context, ids []int) ([]models
 			return nil, fmt.Errorf("failed to scan book row: %w", err)
 		}
 
+		repoBooks = append(repoBooks, book)
 		if categoryName != "" {
-			book.Category = &models.Category{
-				ID:   book.CategoryID,
-				Name: categoryName,
-			}
+			categoryNames[book.ID] = categoryName
 		}
-
-		books = append(books, book)
 	}
 
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("error iterating through results: %w", err)
 	}
 
-	return books, nil
+	// Convert repository models to domain models
+	domainBooks := repomodels.BookSliceToDomain(repoBooks)
+
+	// Add category information
+	for i := range domainBooks {
+		bookID := domainBooks[i].ID
+		if categoryName, ok := categoryNames[bookID]; ok {
+			domainBooks[i].Category = &models.Category{
+				ID:   domainBooks[i].CategoryID,
+				Name: categoryName,
+			}
+		}
+	}
+
+	return domainBooks, nil
 }
 
-// ReserveBooks reserves the specified number of books
+// ReserveBooks reserves books (decreases available quantity)
+// Returns an error if any of the items is unavailable
 func (r *BookRepository) ReserveBooks(ctx context.Context, bookIDs []int) error {
 	tx, err := r.db.Begin(ctx)
 	if err != nil {

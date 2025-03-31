@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	servicemodels "github.com/bookshop/api/internal/app/book/models"
 	"github.com/bookshop/api/internal/domain/models"
 	"github.com/bookshop/api/internal/domain/repositories"
 	"github.com/bookshop/api/internal/domain/services"
@@ -26,58 +27,69 @@ func NewService(bookRepo repositories.BookRepository, categoryRepo repositories.
 
 // Create creates a new book
 func (s *Service) Create(ctx context.Context, input models.BookCreate) (*models.Book, error) {
-	// Check if the category exists
-	_, err := s.categoryRepo.GetByID(ctx, input.CategoryID)
-	if err != nil {
-		return nil, fmt.Errorf("error checking category: %w", err)
-	}
-
-	// Create a new book
-	now := time.Now()
-	book := &models.Book{
+	// Convert to service model
+	serviceInput := servicemodels.BookCreate{
 		Title:         input.Title,
 		Author:        input.Author,
 		YearPublished: input.YearPublished,
 		Price:         input.Price,
 		Stock:         input.Stock,
 		CategoryID:    input.CategoryID,
+	}
+
+	// Check if the category exists
+	_, err := s.categoryRepo.GetByID(ctx, serviceInput.CategoryID)
+	if err != nil {
+		return nil, fmt.Errorf("error checking category: %w", err)
+	}
+
+	// Create a new book
+	now := time.Now()
+	domainBook := &models.Book{
+		Title:         serviceInput.Title,
+		Author:        serviceInput.Author,
+		YearPublished: serviceInput.YearPublished,
+		Price:         serviceInput.Price,
+		Stock:         serviceInput.Stock,
+		CategoryID:    serviceInput.CategoryID,
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
 
 	// Save book to database
-	if err := s.bookRepo.Create(ctx, book); err != nil {
+	if err := s.bookRepo.Create(ctx, domainBook); err != nil {
 		return nil, fmt.Errorf("error creating book: %w", err)
 	}
 
 	// Load category information
-	category, err := s.categoryRepo.GetByID(ctx, book.CategoryID)
+	category, err := s.categoryRepo.GetByID(ctx, domainBook.CategoryID)
 	if err != nil {
 		// Not returning an error as the book has already been created
-		return book, nil
+		return domainBook, nil
 	}
-	book.Category = category
+	domainBook.Category = category
 
-	return book, nil
+	return domainBook, nil
 }
 
 // GetByID returns a book by its ID
 func (s *Service) GetByID(ctx context.Context, id int) (*models.Book, error) {
 	// Get book from repository
-	book, err := s.bookRepo.GetByID(ctx, id)
+	domainBook, err := s.bookRepo.GetByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("error getting book: %w", err)
 	}
 
-	// Load category information
-	category, err := s.categoryRepo.GetByID(ctx, book.CategoryID)
-	if err != nil {
+	// Load category information if needed
+	if domainBook.Category == nil {
+		category, err := s.categoryRepo.GetByID(ctx, domainBook.CategoryID)
+		if err == nil {
+			domainBook.Category = category
+		}
 		// Not returning an error as the book was found
-		return book, nil
 	}
-	book.Category = category
 
-	return book, nil
+	return domainBook, nil
 }
 
 // List returns a list of books with filtering
