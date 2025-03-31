@@ -124,7 +124,7 @@ func (s *Service) Login(ctx context.Context, input models.UserCredentials) (stri
 }
 
 // ValidateToken validates the token and returns user ID
-func (s *Service) ValidateToken(ctx context.Context, token string) (int, error) {
+func (s *Service) ValidateToken(_ context.Context, token string) (int, error) {
 	return s.tokenMgr.ValidateToken(token)
 }
 
