@@ -2,9 +2,11 @@ package config
 
 import (
 	"fmt"
+	"os"
+	"strconv"
 	"time"
 
-	"github.com/spf13/viper"
+	"github.com/joho/godotenv"
 )
 
 // Config contains all application settings
@@ -61,21 +63,86 @@ type JWTConfig struct {
 	CartExpirationTTL time.Duration
 }
 
-// LoadConfig loads configuration from file and environment variables
-func LoadConfig(configPath string) (*Config, error) {
-	viper.SetConfigFile(configPath)
-	viper.AutomaticEnv()
+// LoadConfig loads configuration from environment variables
+// For local development, it will try to load .env file first
+func LoadConfig() (*Config, error) {
+	// Load .env file if it exists (for local development)
+	_ = godotenv.Load()
 
-	if err := viper.ReadInConfig(); err != nil {
-		return nil, fmt.Errorf("error reading configuration: %w", err)
+	return &Config{
+		App:      loadAppConfig(),
+		HTTP:     loadHTTPConfig(),
+		Database: loadDatabaseConfig(),
+		Redis:    loadRedisConfig(),
+		JWT:      loadJWTConfig(),
+	}, nil
+}
+
+func loadAppConfig() AppConfig {
+	return AppConfig{
+		Name:        getEnv("APP_NAME", "bookshop-api"),
+		Environment: getEnv("APP_ENV", "development"),
+		LogLevel:    getEnv("LOG_LEVEL", "info"),
 	}
+}
 
-	var cfg Config
-	if err := viper.Unmarshal(&cfg); err != nil {
-		return nil, fmt.Errorf("error deserializing configuration: %w", err)
+func loadHTTPConfig() HTTPConfig {
+	return HTTPConfig{
+		Host:         getEnv("HTTP_HOST", "0.0.0.0"),
+		Port:         getEnvAsInt("HTTP_PORT", 8080),
+		ReadTimeout:  time.Duration(getEnvAsInt("HTTP_READ_TIMEOUT_SECONDS", 5)) * time.Second,
+		WriteTimeout: time.Duration(getEnvAsInt("HTTP_WRITE_TIMEOUT_SECONDS", 5)) * time.Second,
+		IdleTimeout:  time.Duration(getEnvAsInt("HTTP_IDLE_TIMEOUT_SECONDS", 120)) * time.Second,
 	}
+}
 
-	return &cfg, nil
+func loadDatabaseConfig() DatabaseConfig {
+	return DatabaseConfig{
+		Host:     getEnv("DB_HOST", "localhost"),
+		Port:     getEnvAsInt("DB_PORT", 5432),
+		User:     getEnv("DB_USER", "bookshop"),
+		Password: getEnv("DB_PASSWORD", "bookshop"),
+		DBName:   getEnv("DB_NAME", "bookshop"),
+		SSLMode:  getEnv("DB_SSL_MODE", "disable"),
+		MaxConns: getEnvAsInt("DB_MAX_CONNS", 10),
+		Timeout:  time.Duration(getEnvAsInt("DB_TIMEOUT_SECONDS", 5)) * time.Second,
+	}
+}
+
+func loadRedisConfig() RedisConfig {
+	return RedisConfig{
+		Host:     getEnv("REDIS_HOST", "localhost"),
+		Port:     getEnvAsInt("REDIS_PORT", 6379),
+		Password: getEnv("REDIS_PASSWORD", ""),
+		DB:       getEnvAsInt("REDIS_DB", 0),
+		Timeout:  time.Duration(getEnvAsInt("REDIS_TIMEOUT_SECONDS", 5)) * time.Second,
+	}
+}
+
+func loadJWTConfig() JWTConfig {
+	return JWTConfig{
+		Secret:            getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
+		AccessTokenTTL:    time.Duration(getEnvAsInt("JWT_ACCESS_TOKEN_TTL_MINUTES", 15)) * time.Minute,
+		RefreshTokenTTL:   time.Duration(getEnvAsInt("JWT_REFRESH_TOKEN_TTL_DAYS", 7)) * 24 * time.Hour,
+		CartExpirationTTL: time.Duration(getEnvAsInt("JWT_CART_EXPIRATION_TTL_HOURS", 24)) * time.Hour,
+	}
+}
+
+// Helper functions to get environment variables with defaults
+func getEnv(key, defaultValue string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+	return defaultValue
+}
+
+func getEnvAsInt(key string, defaultValue int) int {
+	if value, exists := os.LookupEnv(key); exists {
+		if intVal, err := strconv.Atoi(value); err == nil {
+			return intVal
+		}
+	}
+	return defaultValue
 }
 
 // GetDSN returns PostgreSQL connection string
