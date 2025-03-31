@@ -145,6 +145,24 @@ func (s *ProfileCacheService) InvalidateUserCache(ctx context.Context, userID in
 	s.logger.Debug("User cache invalidation submitted to worker pool", "userID", userIDStr)
 }
 
+// InvalidateUserCacheAsync asynchronously invalidates user cache entries without blocking
+// All invalidation operations are delegated to the worker pool to avoid blocking the main thread
+func (s *ProfileCacheService) InvalidateUserCacheAsync(userID int) {
+	userIDStr := strconv.Itoa(userID)
+
+	// Create delete task for worker pool
+	task := cache.CacheTask{
+		Operation: cache.OperationDelete,
+		ProfileID: userIDStr,
+	}
+
+	// Submit task to worker pool but don't wait for completion or result
+	// This is a "fire and forget" operation that won't block the calling code
+	s.cacheWorker.ProcessTask(context.Background(), task)
+
+	s.logger.Debug("User cache invalidation submitted to worker pool (non-blocking)", "userID", userIDStr)
+}
+
 // UpdateUserCache updates user's cache when their data changes
 func (s *ProfileCacheService) UpdateUserCache(ctx context.Context, user *models.User, orders []models.Order) {
 	userIDStr := strconv.Itoa(user.ID)
@@ -168,6 +186,30 @@ func (s *ProfileCacheService) UpdateUserCache(ctx context.Context, user *models.
 	s.logger.Debug("User cache update submitted to worker pool", "userID", userIDStr)
 }
 
+// UpdateUserCacheAsync updates user's cache asynchronously without blocking
+// Delegates the cache update operation to the worker pool
+func (s *ProfileCacheService) UpdateUserCacheAsync(user *models.User, orders []models.Order) {
+	userIDStr := strconv.Itoa(user.ID)
+
+	// Create update task for worker pool
+	task := cache.CacheTask{
+		Operation: cache.OperationSet,
+		ProfileID: userIDStr,
+		Data: struct {
+			User   *models.User
+			Orders []models.Order
+		}{
+			User:   user,
+			Orders: orders,
+		},
+	}
+
+	// Submit task to worker pool without waiting for the result
+	s.cacheWorker.ProcessTask(context.Background(), task)
+
+	s.logger.Debug("User cache update submitted to worker pool (non-blocking)", "userID", userIDStr)
+}
+
 // UpdateOrderInCache updates a specific order in the cache
 func (s *ProfileCacheService) UpdateOrderInCache(ctx context.Context, userID int, order *models.Order) {
 	userIDStr := strconv.Itoa(userID)
@@ -185,6 +227,25 @@ func (s *ProfileCacheService) UpdateOrderInCache(ctx context.Context, userID int
 	s.cacheWorker.ProcessTask(ctx, task)
 
 	s.logger.Debug("Order cache update submitted to worker pool", "userID", userIDStr, "orderID", orderIDStr)
+}
+
+// UpdateOrderInCacheAsync updates a specific order in the cache asynchronously without blocking
+func (s *ProfileCacheService) UpdateOrderInCacheAsync(userID int, order *models.Order) {
+	userIDStr := strconv.Itoa(userID)
+	orderIDStr := strconv.Itoa(order.ID)
+
+	// Create update task for worker pool
+	task := cache.CacheTask{
+		Operation: cache.OperationUpdate,
+		ProfileID: userIDStr,
+		OrderID:   orderIDStr,
+		Data:      order,
+	}
+
+	// Submit task to worker pool without waiting for the result
+	s.cacheWorker.ProcessTask(context.Background(), task)
+
+	s.logger.Debug("Order cache update submitted to worker pool (non-blocking)", "userID", userIDStr, "orderID", orderIDStr)
 }
 
 // convertCacheToModels converts a cached profile to domain models

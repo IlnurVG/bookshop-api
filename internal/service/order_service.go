@@ -3,14 +3,25 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
 
+	domainerrors "github.com/bookshop/api/internal/domain/errors"
 	"github.com/bookshop/api/internal/domain/models"
 	"github.com/bookshop/api/internal/domain/repositories"
 	"github.com/bookshop/api/internal/pkg/cache"
 	"github.com/bookshop/api/pkg/logger"
+)
+
+const (
+	// OrderStatusNew status for new orders
+	OrderStatusNew = "new"
+	// OrderStatusPaid status for paid orders
+	OrderStatusPaid = "paid"
+	// OrderStatusCanceled status for canceled orders
+	OrderStatusCanceled = "canceled"
 )
 
 // OrderService handles business logic related to orders
@@ -498,4 +509,149 @@ func (s *OrderService) Shutdown() {
 	s.orderProcessor.Shutdown()
 
 	s.logger.Info("Order service shutdown completed")
+}
+
+// Checkout processes an order from the user's cart
+func (s *OrderService) Checkout(ctx context.Context, userID int) (*models.Order, error) {
+	var order *models.Order
+
+	// Execute the checkout in a transaction
+	err := s.txManager.WithTransaction(ctx, func(txCtx context.Context) error {
+		// Get user's cart
+		cart, err := s.cartRepo.GetCart(txCtx, userID)
+		if err != nil {
+			return fmt.Errorf("error getting cart: %w", err)
+		}
+
+		// Check if cart is empty
+		if len(cart.Items) == 0 {
+			return domainerrors.ErrEmptyCart
+		}
+
+		// Get books from cart
+		bookIDs := make([]int, len(cart.Items))
+		for i, item := range cart.Items {
+			bookIDs[i] = item.BookID
+		}
+
+		books, err := s.bookRepo.GetBooksByIDs(txCtx, bookIDs)
+		if err != nil {
+			return fmt.Errorf("error getting books: %w", err)
+		}
+
+		// Check if all books are in stock
+		for _, book := range books {
+			if book.Stock <= 0 {
+				return domainerrors.ErrOutOfStock
+			}
+		}
+
+		// Create order
+		order = &models.Order{
+			UserID:     userID,
+			Status:     OrderStatusNew,
+			TotalPrice: 0,
+			Items:      make([]models.OrderItem, len(cart.Items)),
+		}
+
+		// Calculate total price and create order items
+		for i, item := range cart.Items {
+			var book *models.Book
+			for _, b := range books {
+				if b.ID == item.BookID {
+					book = &b
+					break
+				}
+			}
+
+			if book == nil {
+				return domainerrors.ErrBookNotFound
+			}
+
+			order.Items[i] = models.OrderItem{
+				BookID: book.ID,
+				Price:  book.Price,
+			}
+			order.TotalPrice += book.Price
+		}
+
+		// Save order
+		if err := s.orderRepo.Create(txCtx, order); err != nil {
+			return fmt.Errorf("error creating order: %w", err)
+		}
+
+		// Update book stock
+		for _, item := range cart.Items {
+			if err := s.bookRepo.DecrementStock(txCtx, item.BookID, 1); err != nil {
+				return fmt.Errorf("error updating book stock: %w", err)
+			}
+		}
+
+		// Clear cart
+		if err := s.cartRepo.ClearCart(txCtx, userID); err != nil {
+			return fmt.Errorf("error clearing cart: %w", err)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	// Invalidate user profile cache after successful order creation
+	// Use non-blocking async version to avoid blocking the request
+	if s.profileCacheService != nil {
+		s.profileCacheService.InvalidateUserCacheAsync(userID)
+	}
+
+	return order, nil
+}
+
+// UpdateOrderStatus updates order status
+func (s *OrderService) UpdateOrderStatus(ctx context.Context, orderID int, status string) error {
+	var order *models.Order
+
+	err := s.txManager.WithTransaction(ctx, func(txCtx context.Context) error {
+		// Check if the order exists
+		var err error
+		order, err = s.orderRepo.GetByID(txCtx, orderID)
+		if err != nil {
+			if errors.Is(err, repositories.ErrNotFound) {
+				return fmt.Errorf("order not found")
+			}
+			return fmt.Errorf("error getting order: %w", err)
+		}
+
+		// Check status validity
+		switch status {
+		case OrderStatusPaid, OrderStatusCanceled:
+			// Valid status
+		default:
+			return fmt.Errorf("invalid order status")
+		}
+
+		// Update status
+		if err := s.orderRepo.UpdateStatus(txCtx, orderID, status); err != nil {
+			return fmt.Errorf("error updating order status: %w", err)
+		}
+
+		// Update order status in our local variable
+		order.Status = status
+
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	// Update the cache after successful status update
+	// Use non-blocking async version to avoid blocking the request
+	if s.profileCacheService != nil && order != nil {
+		// Update the specific order in cache asynchronously
+		s.profileCacheService.UpdateOrderInCacheAsync(order.UserID, order)
+	}
+
+	return nil
 }

@@ -143,8 +143,9 @@ func (s *Service) Checkout(ctx context.Context, userID int) (*models.Order, erro
 	}
 
 	// Invalidate user profile cache after successful order creation
+	// Use non-blocking async version to avoid blocking the request
 	if s.profileCacheService != nil {
-		s.profileCacheService.InvalidateUserCache(context.Background(), userID)
+		s.profileCacheService.InvalidateUserCacheAsync(userID)
 	}
 
 	return order, nil
@@ -219,9 +220,10 @@ func (s *Service) UpdateOrderStatus(ctx context.Context, orderID int, status str
 	}
 
 	// Update the cache after successful status update
+	// Use non-blocking async version to avoid blocking the request
 	if s.profileCacheService != nil && order != nil {
-		// Update the specific order in cache
-		s.profileCacheService.UpdateOrderInCache(context.Background(), order.UserID, order)
+		// Update the specific order in cache asynchronously
+		s.profileCacheService.UpdateOrderInCacheAsync(order.UserID, order)
 	}
 
 	return nil
